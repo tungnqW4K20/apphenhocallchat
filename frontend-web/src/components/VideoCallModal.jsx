@@ -98,7 +98,15 @@ export const VideoCallModal = ({ onOpenReport }) => {
     };
   }, []);
 
-  const [isRemoteVideoPlaying, setIsRemoteVideoPlaying] = useState(false);
+  const [showConnectingNotice, setShowConnectingNotice] = useState(true);
+
+  useEffect(() => {
+    setShowConnectingNotice(true);
+    const timer = setTimeout(() => {
+      setShowConnectingNotice(false);
+    }, 2500);
+    return () => clearTimeout(timer);
+  }, [isInCall, callPartner]);
 
   useEffect(() => {
     setIsRemoteVideoPlaying(false);
@@ -209,11 +217,13 @@ export const VideoCallModal = ({ onOpenReport }) => {
             className="w-full h-full object-cover transition-all duration-500"
           />
 
-          {/* Connecting Camera Notice */}
-          <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center p-6 text-center space-y-3 z-10">
-            <div className="w-16 h-16 rounded-full border-4 border-rose-500 border-t-transparent animate-spin" />
-            <p className="text-sm font-bold text-white shadow">Đang đồng bộ luồng Camera HD với {callPartner.full_name}...</p>
-          </div>
+          {/* Connecting Camera Notice (Auto-dismisses after 2.5s) */}
+          {showConnectingNotice && (
+            <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center p-6 text-center space-y-3 z-10 transition-opacity duration-500 animate-fade-in">
+              <div className="w-12 h-12 rounded-full border-4 border-rose-500 border-t-transparent animate-spin" />
+              <p className="text-sm font-bold text-white shadow">Đang đồng bộ luồng Camera HD với {callPartner.full_name}...</p>
+            </div>
+          )}
         </div>
 
         {/* Live Camera Broadcast Vignette & Gradients */}
