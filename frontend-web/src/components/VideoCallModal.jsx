@@ -98,6 +98,7 @@ export const VideoCallModal = ({ onOpenReport }) => {
     };
   }, []);
 
+  const [isRemoteVideoPlaying, setIsRemoteVideoPlaying] = useState(false);
   const [showConnectingNotice, setShowConnectingNotice] = useState(true);
 
   useEffect(() => {
