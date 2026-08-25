@@ -54,6 +54,10 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/checkin', checkinRoutes);
 
 // Health check & Server info
+app.get(['/api/ping', '/ping'], (req, res) => {
+  res.status(200).send('pong');
+});
+
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'online',
