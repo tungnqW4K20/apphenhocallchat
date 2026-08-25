@@ -1781,18 +1781,73 @@ class DataService {
     userId = Number(userId);
     const store = getMockStore();
     const msg = (store.messages || []).find(m => m.id === messageId);
-    if (!msg) throw new Error('Không tìm thấy tin nhắn');
-    if (msg.sender_id !== userId && msg.receiver_id !== userId) throw new Error('Bạn không có quyền xóa tin nhắn này');
+    
+    if (!msg && isUsingFallback()) {
+      throw new Error('Không tìm thấy tin nhắn');
+    }
 
-    store.messages = store.messages.filter(m => m.id !== messageId);
+    const conversationId = msg ? msg.conversation_id : null;
+
+    // 1. If physical file exists in uploads, remove it
+    if (msg && msg.content && msg.content.startsWith('/uploads/')) {
+      try {
+        const fs = require('fs');
+        const path = require('path');
+        const filePath = path.join(__dirname, '../public', msg.content);
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+        }
+      } catch (err) {
+        console.warn('Delete uploaded file notice:', err.message);
+      }
+    }
+
+    // 2. MySQL Delete if active
+    if (!isUsingFallback()) {
+      try {
+        await db.query('DELETE FROM messages WHERE id = ?', [messageId]);
+      } catch (err) {
+        console.warn('MySQL deleteMessage notice:', err.message);
+      }
+    }
+
+    // 3. MockStore Delete
+    store.messages = (store.messages || []).filter(m => m.id !== messageId);
+
+    // 4. Update Conversation last_message
+    if (conversationId) {
+      const remainingMsgs = store.messages.filter(m => m.conversation_id === conversationId);
+      const conv = (store.conversations || []).find(c => c.id === conversationId);
+      if (conv) {
+        if (remainingMsgs.length > 0) {
+          const lastM = remainingMsgs[remainingMsgs.length - 1];
+          conv.last_message = lastM.message_type === 'image' ? '[Hình ảnh]' : lastM.message_type === 'video' ? '[Video]' : lastM.message_type === 'audio' ? '[Ghi âm]' : lastM.content;
+          conv.last_message_at = lastM.created_at;
+        } else {
+          conv.last_message = '';
+          conv.last_message_at = conv.created_at;
+        }
+      }
+    }
+
     saveStore();
-    return msg;
+    return msg || { id: messageId, conversation_id: conversationId };
   }
 
   async deleteConversation(conversationId, userId) {
     conversationId = Number(conversationId);
     userId = Number(userId);
     const store = getMockStore();
+
+    if (!isUsingFallback()) {
+      try {
+        await db.query('DELETE FROM messages WHERE conversation_id = ?', [conversationId]);
+        await db.query('DELETE FROM conversations WHERE id = ?', [conversationId]);
+      } catch (err) {
+        console.warn('MySQL deleteConversation notice:', err.message);
+      }
+    }
+
     store.conversations = (store.conversations || []).filter(c => c.id !== conversationId);
     store.messages = (store.messages || []).filter(m => m.conversation_id !== conversationId);
     saveStore();

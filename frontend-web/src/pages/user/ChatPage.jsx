@@ -570,22 +570,22 @@ export const ChatPage = ({ initialPartner, onOpenProfile, onOpenGift }) => {
                           />
                         )}
 
-                        {/* Action Menu Popover for Sent Messages */}
-                        {isMine && !isRecalled && (
-                          <div className="relative">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setActiveMenuMsgId(activeMenuMsgId === m.id ? null : m.id);
-                              }}
-                              className="opacity-0 group-hover:opacity-100 p-1.5 rounded-full hover:bg-white/10 text-gray-400 hover:text-white transition-opacity"
-                              title="Tùy chọn tin nhắn"
-                            >
-                              <MoreVertical className="w-3.5 h-3.5" />
-                            </button>
+                        {/* Action Menu Popover for All Messages */}
+                        <div className="relative">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActiveMenuMsgId(activeMenuMsgId === m.id ? null : m.id);
+                            }}
+                            className="opacity-70 sm:opacity-0 group-hover:opacity-100 p-1.5 rounded-full hover:bg-white/10 text-gray-400 hover:text-white transition-all cursor-pointer"
+                            title="Tùy chọn tin nhắn"
+                          >
+                            <MoreVertical className="w-3.5 h-3.5" />
+                          </button>
 
-                            {activeMenuMsgId === m.id && (
-                              <div className="absolute bottom-full right-0 mb-1 z-30 bg-[#1e1d2d] border border-white/15 rounded-xl shadow-2xl p-1.5 min-w-[140px] flex flex-col gap-1 animate-fade-in text-xs">
+                          {activeMenuMsgId === m.id && (
+                            <div className={`absolute bottom-full ${isMine ? 'right-0' : 'left-0'} mb-1 z-30 bg-[#1e1d2d] border border-white/15 rounded-xl shadow-2xl p-1.5 min-w-[140px] flex flex-col gap-1 animate-fade-in text-xs`}>
+                              {isMine && !isRecalled && (
                                 <button
                                   onClick={() => handleRecallMessage(m.id)}
                                   className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-white/10 text-amber-300 font-semibold transition-colors text-left"
@@ -593,17 +593,17 @@ export const ChatPage = ({ initialPartner, onOpenProfile, onOpenGift }) => {
                                   <RotateCcw className="w-3.5 h-3.5" />
                                   <span>Thu hồi</span>
                                 </button>
-                                <button
-                                  onClick={() => handleDeleteMessage(m.id)}
-                                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-rose-500/20 text-rose-400 font-semibold transition-colors text-left"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                  <span>Xóa vĩnh viễn</span>
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        )}
+                              )}
+                              <button
+                                onClick={() => handleDeleteMessage(m.id)}
+                                className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-rose-500/20 text-rose-400 font-semibold transition-colors text-left"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                                <span>Xóa vĩnh viễn</span>
+                              </button>
+                            </div>
+                          )}
+                        </div>
 
                         {/* Message Bubble Content */}
                         <div className={`max-w-[75%] rounded-2xl px-4 py-2.5 shadow-md ${
@@ -634,6 +634,14 @@ export const ChatPage = ({ initialPartner, onOpenProfile, onOpenGift }) => {
                                 controls
                                 playsInline
                                 className="max-h-72 w-full rounded-xl object-contain"
+                              />
+                            </div>
+                          ) : m.message_type === 'audio' ? (
+                            <div className="my-1 max-w-xs">
+                              <audio
+                                src={getImageSrc(m.content)}
+                                controls
+                                className="w-full h-8"
                               />
                             </div>
                           ) : m.message_type === 'gift' ? (
