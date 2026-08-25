@@ -4,10 +4,9 @@ import { useAuth } from './AuthContext';
 
 const SocketContext = createContext(null);
 
+const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || (
-  typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1'
-    ? `${window.location.protocol}//${window.location.hostname}:5001`
-    : 'http://localhost:5001'
+  isLocal ? 'http://localhost:5001' : 'https://dating-backend-islg.onrender.com'
 );
 
 export const SocketProvider = ({ children }) => {

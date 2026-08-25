@@ -19,17 +19,20 @@ const storage = multer.diskStorage({
 });
 
 const fileFilter = (req, file, cb) => {
-  const allowedMimes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'audio/webm', 'audio/mpeg', 'audio/wav', 'audio/ogg'];
-  if (allowedMimes.includes(file.mimetype) || file.mimetype.startsWith('image/') || file.mimetype.startsWith('audio/')) {
+  const isImage = file.mimetype.startsWith('image/') || file.originalname.match(/\.(jpg|jpeg|png|gif|webp|heic|heif)$/i);
+  const isVideo = file.mimetype.startsWith('video/') || file.originalname.match(/\.(mp4|mov|avi|wmv|webm|mkv|3gp)$/i);
+  const isAudio = file.mimetype.startsWith('audio/') || file.originalname.match(/\.(mp3|wav|ogg|m4a|aac|webm)$/i);
+
+  if (isImage || isVideo || isAudio) {
     cb(null, true);
   } else {
-    cb(new Error('Định dạng tệp không được hỗ trợ (chỉ chấp nhận ảnh và âm thanh)!'), false);
+    cb(new Error('Định dạng tệp không được hỗ trợ (chấp nhận hình ảnh, video và âm thanh)!'), false);
   }
 };
 
 const upload = multer({
   storage: storage,
-  limits: { fileSize: 15 * 1024 * 1024 }, // 15MB
+  limits: { fileSize: 100 * 1024 * 1024 }, // 100MB for HD videos and photos
   fileFilter: fileFilter
 });
 

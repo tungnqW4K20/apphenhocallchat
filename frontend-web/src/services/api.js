@@ -1,7 +1,6 @@
+const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 const API_BASE_URL = import.meta.env.VITE_API_URL || (
-  typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1'
-    ? `${window.location.protocol}//${window.location.hostname}:5001/api`
-    : 'http://localhost:5001/api'
+  isLocal ? 'http://localhost:5001/api' : 'https://dating-backend-islg.onrender.com/api'
 );
 
 async function request(endpoint, options = {}) {
