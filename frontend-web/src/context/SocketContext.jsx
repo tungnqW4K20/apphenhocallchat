@@ -4,7 +4,11 @@ import { useAuth } from './AuthContext';
 
 const SocketContext = createContext(null);
 
-const SOCKET_URL = 'http://localhost:5001';
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || (
+  typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1'
+    ? `${window.location.protocol}//${window.location.hostname}:5001`
+    : 'http://localhost:5001'
+);
 
 export const SocketProvider = ({ children }) => {
   const { currentUser, updateBalance } = useAuth();
