@@ -106,7 +106,8 @@ export const ChatPage = ({ initialPartner, onOpenProfile, onOpenGift }) => {
       if (convsRes.success) {
         const convList = convsRes.conversations || [];
         setConversations(convList);
-        if (autoSelectFirst && !activeConv && convList.length > 0 && !initialPartner) {
+        const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+        if (autoSelectFirst && !activeConv && convList.length > 0 && !initialPartner && !isMobile) {
           selectConversation(convList[0]);
         }
       }
