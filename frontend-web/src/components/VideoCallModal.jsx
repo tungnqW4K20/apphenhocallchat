@@ -104,6 +104,20 @@ export const VideoCallModal = ({ onOpenReport }) => {
     }
   }, [inCallMessages, isChatOpen]);
 
+  useEffect(() => {
+    if (remoteVideoRef?.current && remoteStream) {
+      remoteVideoRef.current.srcObject = remoteStream;
+      remoteVideoRef.current.play().catch(() => {});
+    }
+  }, [remoteStream]);
+
+  useEffect(() => {
+    if (localVideoRef?.current && localStream) {
+      localVideoRef.current.srcObject = localStream;
+      localVideoRef.current.play().catch(() => {});
+    }
+  }, [localStream]);
+
   if (!isInCall || !callPartner) return null;
 
   const formatDuration = (secs) => {
@@ -187,17 +201,15 @@ export const VideoCallModal = ({ onOpenReport }) => {
           </div>
         </div>
 
-        {/* WebRTC Video Track (Overlays when active remote WebRTC stream exists) */}
-        {remoteStream && (
-          <video
-            ref={remoteVideoRef}
-            autoPlay
-            playsInline
-            className={`absolute inset-0 w-full h-full object-cover z-10 transition-all duration-300 ${
-              beautyFilter ? 'brightness-105 contrast-105 saturate-110' : ''
-            }`}
-          />
-        )}
+        {/* WebRTC Video Track (Full Screen Live Video of Partner) */}
+        <video
+          ref={remoteVideoRef}
+          autoPlay
+          playsInline
+          className={`absolute inset-0 w-full h-full object-cover z-10 transition-opacity duration-300 ${
+            remoteStream ? 'opacity-100' : 'opacity-0 pointer-events-none'
+          } ${beautyFilter ? 'brightness-105 contrast-105 saturate-110' : ''}`}
+        />
 
         {/* Floating Gift Animations Overlay */}
         <div className="absolute inset-0 pointer-events-none z-30 overflow-hidden">

@@ -18,6 +18,33 @@ class LocationService {
     this.cacheMaxAgeMs = 24 * 60 * 60 * 1000; // 24 hours
   }
 
+  getCityCoordinates(cityName) {
+    if (!cityName) return { lat: 21.0285, lon: 105.8542 };
+    const cityMap = {
+      'Hà Nội': { lat: 21.0285, lon: 105.8542 },
+      'TP. Hồ Chí Minh': { lat: 10.8231, lon: 106.6297 },
+      'Hồ Chí Minh': { lat: 10.8231, lon: 106.6297 },
+      'Đà Nẵng': { lat: 16.0544, lon: 108.2022 },
+      'Hải Phòng': { lat: 20.8449, lon: 106.6881 },
+      'Cần Thơ': { lat: 10.0452, lon: 105.7469 },
+      'Nha Trang': { lat: 12.2388, lon: 109.1967 },
+      'Đà Lạt': { lat: 11.9404, lon: 108.4583 },
+      'Huế': { lat: 16.4637, lon: 107.5909 },
+      'Vũng Tàu': { lat: 10.3460, lon: 107.0843 },
+      'Bình Dương': { lat: 11.1667, lon: 106.6667 },
+      'Đồng Nai': { lat: 10.9574, lon: 106.8427 },
+      'Hưng Yên': { lat: 20.6464, lon: 106.0511 },
+      'Bắc Ninh': { lat: 21.1861, lon: 106.0763 },
+      'Quảng Ninh': { lat: 20.9502, lon: 107.0734 },
+      'Hải Dương': { lat: 20.9386, lon: 106.3155 },
+      'Nam Định': { lat: 20.4344, lon: 106.1773 },
+      'Thái Nguyên': { lat: 21.5928, lon: 105.8442 },
+      'Nghệ An': { lat: 19.2342, lon: 104.9200 },
+      'Thanh Hóa': { lat: 19.8067, lon: 105.7852 }
+    };
+    return cityMap[cityName] || { lat: 21.0285, lon: 105.8542 };
+  }
+
   /**
    * Calculate distance in kilometers between two coordinates using optimized Haversine formula
    */

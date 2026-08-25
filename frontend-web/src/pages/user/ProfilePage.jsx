@@ -267,14 +267,58 @@ export const ProfilePage = ({ onOpenShop }) => {
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-gray-300 mb-1">Thành phố</label>
-                <input
-                  type="text"
+                <label className="block text-xs font-semibold text-gray-300 mb-1 flex items-center justify-between">
+                  <span>Thành phố / Tỉnh</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (navigator.geolocation) {
+                        navigator.geolocation.getCurrentPosition(async (pos) => {
+                          const { latitude, longitude } = pos.coords;
+                          setFormData(prev => ({ ...prev, latitude, longitude }));
+                          const res = await api.updateLocation({ latitude, longitude, city: formData.city });
+                          if (res.success && res.location?.city) {
+                            setFormData(prev => ({ ...prev, city: res.location.city, latitude, longitude }));
+                          }
+                          setMsg({ text: `📍 Đã cập nhật tọa độ GPS: [${latitude.toFixed(3)}, ${longitude.toFixed(3)}]`, type: 'success' });
+                          await fetchCurrentUser();
+                        }, (err) => {
+                          alert('Vui lòng cấp quyền truy cập vị trí trên trình duyệt: ' + err.message);
+                        });
+                      }
+                    }}
+                    className="text-[10px] text-cyan-400 hover:text-cyan-300 flex items-center gap-1 font-bold"
+                  >
+                    <MapPin className="w-3 h-3" />
+                    <span>Lấy GPS hiện tại</span>
+                  </button>
+                </label>
+                <select
                   name="city"
                   value={formData.city}
                   onChange={handleInputChange}
-                  className="w-full px-3.5 py-2.5 bg-white/5 border border-white/10 rounded-xl text-sm text-white focus:outline-none focus:border-rose-500"
-                />
+                  className="w-full px-3.5 py-2.5 bg-[#1e1d2b] border border-white/10 rounded-xl text-sm text-white focus:outline-none focus:border-rose-500"
+                >
+                  <option value="Hà Nội">Hà Nội</option>
+                  <option value="TP. Hồ Chí Minh">TP. Hồ Chí Minh</option>
+                  <option value="Đà Nẵng">Đà Nẵng</option>
+                  <option value="Hải Phòng">Hải Phòng</option>
+                  <option value="Cần Thơ">Cần Thơ</option>
+                  <option value="Nha Trang">Nha Trang</option>
+                  <option value="Đà Lạt">Đà Lạt</option>
+                  <option value="Huế">Huế</option>
+                  <option value="Vũng Tàu">Vũng Tàu</option>
+                  <option value="Bình Dương">Bình Dương</option>
+                  <option value="Đồng Nai">Đồng Nai</option>
+                  <option value="Hưng Yên">Hưng Yên</option>
+                  <option value="Bắc Ninh">Bắc Ninh</option>
+                  <option value="Quảng Ninh">Quảng Ninh</option>
+                  <option value="Hải Dương">Hải Dương</option>
+                  <option value="Nam Định">Nam Định</option>
+                  <option value="Thái Nguyên">Thái Nguyên</option>
+                  <option value="Nghệ An">Nghệ An</option>
+                  <option value="Thanh Hóa">Thanh Hóa</option>
+                </select>
               </div>
             </div>
 

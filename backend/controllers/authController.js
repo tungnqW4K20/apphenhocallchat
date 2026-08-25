@@ -1,4 +1,5 @@
 const dataService = require('../models/dataService');
+const locationService = require('../services/locationService');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 
@@ -12,7 +13,7 @@ const generateToken = (user) => {
 
 const register = async (req, res) => {
   try {
-    const { username, email, password, full_name, gender, birth_date, age, bio, avatar, job, city } = req.body;
+    const { username, email, password, full_name, gender, birth_date, age, bio, avatar, job, city, latitude, longitude } = req.body;
 
     if (!username || !email || !password || !full_name) {
       return res.status(400).json({ success: false, message: 'Vui lòng điền đầy đủ các thông tin bắt buộc' });
@@ -28,18 +29,25 @@ const register = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Tên người dùng này đã tồn tại' });
     }
 
+    const defaultCoords = locationService.getCityCoordinates(city || 'Hà Nội');
+    const userLat = (latitude !== undefined && latitude !== null) ? Number(latitude) : defaultCoords.lat;
+    const userLon = (longitude !== undefined && longitude !== null) ? Number(longitude) : defaultCoords.lon;
+
+    const hashedPassword = await bcrypt.hash(password, 10);
     const user = await dataService.createUser({
       username,
       email,
-      password,
+      password: hashedPassword,
       full_name,
       gender: gender || 'male',
-      birth_date: birth_date || '2002-01-01',
-      age: Number(age) || 22,
-      bio: bio || 'Xin chào! Rất vui được làm quen trên app ✨',
+      birth_date: birth_date || '2000-01-01',
+      age: age || 22,
+      bio: bio || 'Xin chào! Rất vui được làm quen với mọi người 🌟',
       avatar: avatar || (gender === 'female' ? 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=500' : 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=500'),
       job: job || 'Thành viên',
       city: city || 'Hà Nội',
+      latitude: userLat,
+      longitude: userLon,
       coins: 200, // Tặng 200 xu khi đăng ký mới để trải nghiệm
       diamonds: 0,
       role: 'user'
@@ -140,6 +148,12 @@ const updateProfile = async (req, res) => {
       if (req.body[field] !== undefined) {
         updateData[field] = req.body[field];
       }
+    }
+
+    if (updateData.city && (updateData.latitude === undefined || updateData.latitude === null)) {
+      const coords = locationService.getCityCoordinates(updateData.city);
+      updateData.latitude = coords.lat;
+      updateData.longitude = coords.lon;
     }
 
     const updatedUser = await dataService.updateUser(req.user.id, updateData);
