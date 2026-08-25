@@ -281,12 +281,19 @@ export const ChatPage = ({ initialPartner, onOpenProfile, onOpenGift }) => {
 
   const getImageSrc = (content) => {
     if (!content) return '';
-    if (content.startsWith('data:') || content.startsWith('http://') || content.startsWith('https://')) {
-      return content;
-    }
     const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
-    const baseUrl = isLocal ? 'http://localhost:5001' : 'https://dating-backend-islg.onrender.com';
-    return `${baseUrl}${content.startsWith('/') ? '' : '/'}${content}`;
+    const cloudHost = 'https://dating-backend-islg.onrender.com';
+    const baseUrl = isLocal ? 'http://localhost:5001' : cloudHost;
+
+    let src = String(content);
+    if (!isLocal && src.includes('localhost:5001')) {
+      src = src.replace(/https?:\/\/localhost:5001/g, cloudHost);
+    }
+
+    if (src.startsWith('data:') || src.startsWith('http://') || src.startsWith('https://')) {
+      return src;
+    }
+    return `${baseUrl}${src.startsWith('/') ? '' : '/'}${src}`;
   };
 
   const renderLastMessagePreview = (c) => {
