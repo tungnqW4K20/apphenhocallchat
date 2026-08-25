@@ -98,6 +98,12 @@ export const VideoCallModal = ({ onOpenReport }) => {
     };
   }, []);
 
+  const [isRemoteVideoPlaying, setIsRemoteVideoPlaying] = useState(false);
+
+  useEffect(() => {
+    setIsRemoteVideoPlaying(false);
+  }, [isInCall, callPartner]);
+
   useEffect(() => {
     if (isChatOpen) {
       chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -107,7 +113,23 @@ export const VideoCallModal = ({ onOpenReport }) => {
   useEffect(() => {
     if (remoteVideoRef?.current && remoteStream) {
       remoteVideoRef.current.srcObject = remoteStream;
-      remoteVideoRef.current.play().catch(() => {});
+      const playPromise = remoteVideoRef.current.play();
+      if (playPromise !== undefined) {
+        playPromise.then(() => {
+          setIsRemoteVideoPlaying(true);
+        }).catch(() => {
+          // If browser blocks unmuted autoplay, mute briefly to start playback then unmute
+          if (remoteVideoRef.current) {
+            remoteVideoRef.current.muted = true;
+            remoteVideoRef.current.play().then(() => {
+              setIsRemoteVideoPlaying(true);
+              setTimeout(() => {
+                if (remoteVideoRef.current) remoteVideoRef.current.muted = false;
+              }, 500);
+            }).catch(() => {});
+          }
+        });
+      }
     }
   }, [remoteStream]);
 
@@ -167,13 +189,15 @@ export const VideoCallModal = ({ onOpenReport }) => {
           ref={remoteVideoRef}
           autoPlay
           playsInline
-          className={`absolute inset-0 w-full h-full object-cover z-20 transition-opacity duration-300 ${
-            remoteStream ? 'opacity-100' : 'opacity-0 pointer-events-none'
+          onPlaying={() => setIsRemoteVideoPlaying(true)}
+          onLoadedData={() => setIsRemoteVideoPlaying(true)}
+          className={`absolute inset-0 w-full h-full object-cover z-20 transition-opacity duration-500 ${
+            isRemoteVideoPlaying ? 'opacity-100' : 'opacity-0 pointer-events-none'
           } ${beautyFilter ? 'brightness-105 contrast-105 saturate-110' : ''}`}
         />
 
         {/* Fallback Partner Portrait & Blurred Background (Shown only before WebRTC stream connects) */}
-        <div className={`absolute inset-0 flex items-center justify-center overflow-hidden z-10 ${remoteStream ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
+        <div className={`absolute inset-0 flex items-center justify-center overflow-hidden z-10 transition-opacity duration-500 ${isRemoteVideoPlaying ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
           <div 
             className="absolute inset-0 scale-125 filter blur-3xl opacity-60 bg-cover bg-center"
             style={{ backgroundImage: `url(${partnerAvatar})` }}
