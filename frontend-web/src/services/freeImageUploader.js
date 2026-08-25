@@ -73,14 +73,40 @@ export async function uploadImageFree(fileOrBlob) {
 
     // 1. Process & Compress on Client for blazing speed on iOS
     const processedFile = await compressImageForMobile(fileOrBlob);
+    const isVideo = processedFile.type && processedFile.type.startsWith('video/');
 
-    // 2. Direct Cloud Backend Multipart Upload
+    // 2. For Images: Try Fast ImgBB CDN First
+    if (!isVideo && processedFile.type && processedFile.type.startsWith('image/')) {
+      try {
+        const formData = new FormData();
+        formData.append('image', processedFile);
+        const freeKey = '6d207e02198a847aa98d0a2a901485a5';
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 6000);
+
+        const res = await fetch(`https://api.imgbb.com/1/upload?key=${freeKey}`, {
+          method: 'POST',
+          body: formData,
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+
+        const data = await res.json();
+        if (data && data.data && data.data.url) {
+          return { success: true, url: data.data.url, type: 'image' };
+        }
+      } catch (err) {
+        console.warn('ImgBB CDN attempt skipped, trying direct cloud backend...', err.message);
+      }
+    }
+
+    // 3. Direct Cloud Backend Multipart Upload (for Video & Image)
     try {
       const backendFormData = new FormData();
       backendFormData.append('file', processedFile);
 
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 25000);
+      const timeoutId = setTimeout(() => controller.abort(), 20000);
 
       const uploadRes = await fetch(`${baseUrl}/api/chat/upload`, {
         method: 'POST',
@@ -96,40 +122,21 @@ export async function uploadImageFree(fileOrBlob) {
         const data = await uploadRes.json();
         if (data && (data.url || data.mediaUrl)) {
           const finalUrl = data.url?.startsWith('http') ? data.url : `${baseUrl}${data.mediaUrl.startsWith('/') ? '' : '/'}${data.mediaUrl}`;
-          return { success: true, url: finalUrl, type: data.type };
+          return { success: true, url: finalUrl, type: data.type || (isVideo ? 'video' : 'image') };
         }
       }
     } catch (e) {
-      console.warn('Direct cloud upload notice:', e.message);
+      console.warn('Direct backend upload notice:', e.message);
     }
 
-    // 3. Fallback: Free ImgBB Cloud API (for images only)
-    if (processedFile.type && processedFile.type.startsWith('image/')) {
-      try {
-        const formData = new FormData();
-        formData.append('image', processedFile);
-        const freeKey = '6d207e02198a847aa98d0a2a901485a5';
-        const res = await fetch(`https://api.imgbb.com/1/upload?key=${freeKey}`, {
-          method: 'POST',
-          body: formData
-        });
-        const data = await res.json();
-        if (data && data.data && data.data.url) {
-          return { success: true, url: data.data.url, type: 'image' };
-        }
-      } catch (err) {
-        console.warn('ImgBB fallback skipped:', err.message);
-      }
-    }
-
-    // 4. Ultimate Local Data URL Fallback
+    // 4. Ultimate Local Data URL Fallback (Guaranteed to display!)
     return new Promise((resolve) => {
       const reader = new FileReader();
       reader.onloadend = () => {
         resolve({ 
           success: true, 
           url: reader.result, 
-          type: fileOrBlob.type?.startsWith('video/') ? 'video' : 'image' 
+          type: isVideo ? 'video' : 'image' 
         });
       };
       reader.readAsDataURL(processedFile);

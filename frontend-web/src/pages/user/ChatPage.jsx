@@ -284,7 +284,9 @@ export const ChatPage = ({ initialPartner, onOpenProfile, onOpenGift }) => {
     if (content.startsWith('data:') || content.startsWith('http://') || content.startsWith('https://')) {
       return content;
     }
-    return `http://localhost:5001${content.startsWith('/') ? '' : '/'}${content}`;
+    const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+    const baseUrl = isLocal ? 'http://localhost:5001' : 'https://dating-backend-islg.onrender.com';
+    return `${baseUrl}${content.startsWith('/') ? '' : '/'}${content}`;
   };
 
   const renderLastMessagePreview = (c) => {
