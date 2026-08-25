@@ -946,20 +946,28 @@ class DataService {
 
   // ====================== CALL LOGS & BILLING ======================
   async createCallLog(data) {
+    let callType = data.call_type || 'direct_video';
+    if (callType === 'video') callType = 'direct_video';
+    if (callType === 'voice') callType = 'direct_voice';
+
     if (!isUsingFallback()) {
-      const res = await db.query(
-        `INSERT INTO call_logs (caller_id, receiver_id, call_type, duration_seconds, coins_spent, diamonds_earned, status, started_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
-        [data.caller_id, data.receiver_id, data.call_type || 'direct_video', data.duration_seconds || 0, data.coins_spent || 0, data.diamonds_earned || 0, data.status || 'completed']
-      );
-      return { id: res.insertId, ...data };
+      try {
+        const res = await db.query(
+          `INSERT INTO call_logs (caller_id, receiver_id, call_type, duration_seconds, coins_spent, diamonds_earned, status, started_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
+          [data.caller_id, data.receiver_id, callType, data.duration_seconds || 0, data.coins_spent || 0, data.diamonds_earned || 0, data.status || 'completed']
+        );
+        return { id: res.insertId, ...data, call_type: callType };
+      } catch (err) {
+        console.warn('MySQL createCallLog notice:', err.message);
+      }
     }
     const store = getMockStore();
     const newLog = {
       id: store.autoIncrementIds.call_logs++,
       caller_id: Number(data.caller_id),
       receiver_id: Number(data.receiver_id),
-      call_type: data.call_type || 'direct_video',
+      call_type: callType,
       duration_seconds: data.duration_seconds || 0,
       coins_spent: data.coins_spent || 0,
       diamonds_earned: data.diamonds_earned || 0,
