@@ -380,11 +380,11 @@ export const ChatPage = ({ initialPartner, onOpenProfile, onOpenGift }) => {
   });
 
   return (
-    <div className="max-w-7xl mx-auto px-0 sm:px-4 py-1 sm:py-4 h-[calc(100dvh-130px)] md:h-[calc(100vh-80px)] flex flex-col">
-      <div className="flex-1 bg-[#14131f] border-0 sm:border border-white/10 rounded-none sm:rounded-3xl overflow-hidden shadow-2xl flex flex-col md:flex-row min-h-0">
+    <div className={`flex flex-col ${activeConv ? 'fixed inset-0 top-[56px] bottom-[56px] z-30 md:relative md:inset-auto md:top-auto md:bottom-auto md:max-w-7xl md:mx-auto md:px-4 md:py-4 md:h-[calc(100vh-80px)]' : 'max-w-7xl mx-auto px-2 sm:px-4 py-2 sm:py-4 h-[calc(100dvh-130px)] md:h-[calc(100vh-80px)]'}`}>
+      <div className="flex-1 bg-[#14131f] border-0 sm:border border-white/10 rounded-none sm:rounded-3xl overflow-hidden shadow-2xl flex flex-col md:flex-row min-h-0 h-full">
         
         {/* LEFT SIDEBAR: MATCHES & CONVERSATIONS */}
-        <div className={`w-full md:w-80 lg:w-96 border-r border-white/10 flex flex-col bg-[#111019] ${activeConv ? 'hidden md:flex' : 'flex'}`}>
+        <div className={`w-full md:w-80 lg:w-96 border-r border-white/10 flex flex-col bg-[#111019] min-h-0 ${activeConv ? 'hidden md:flex' : 'flex'}`}>
           
           {/* Matches Header Bar */}
           <div className="p-4 border-b border-white/10">
@@ -482,11 +482,11 @@ export const ChatPage = ({ initialPartner, onOpenProfile, onOpenGift }) => {
         </div>
 
         {/* RIGHT AREA: ACTIVE CHAT VIEW */}
-        <div className={`flex-1 flex flex-col bg-[#161522] ${!activeConv ? 'hidden md:flex' : 'flex'}`}>
+        <div className={`flex-1 flex flex-col bg-[#161522] min-h-0 h-full overflow-hidden ${!activeConv ? 'hidden md:flex' : 'flex'}`}>
           {activeConv ? (
             <>
               {/* Chat Header */}
-              <div className="p-3.5 sm:p-4 bg-[#111019] border-b border-white/10 flex items-center justify-between">
+              <div className="p-3.5 sm:p-4 bg-[#111019] border-b border-white/10 flex items-center justify-between shrink-0">
                 
                 <div className="flex items-center gap-3">
                   <button
