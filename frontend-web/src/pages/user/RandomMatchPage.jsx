@@ -17,12 +17,12 @@ export const RandomMatchPage = ({ onOpenShop }) => {
   const { currentUser } = useAuth();
   const { isSearchingQueue, queueMessage, startRandomMatchQueue, leaveRandomMatchQueue } = useWebRTC();
 
-  const [genderFilter, setGenderFilter] = useState('female'); // 'all', 'female', 'male'
+  const [genderFilter, setGenderFilter] = useState('all'); // 'all', 'female', 'male'
   const [regionFilter, setRegionFilter] = useState('vietnam');
 
   const handleStartMatch = () => {
     if (!currentUser) return;
-    if ((currentUser.coins || 0) < 20) {
+    if (currentUser.gender !== 'female' && (currentUser.coins || 0) < 20) {
       alert('Bạn cần tối thiểu 20 Xu để bắt đầu ghép đôi video ngẫu nhiên. Vui lòng nạp thêm Xu!');
       onOpenShop();
       return;

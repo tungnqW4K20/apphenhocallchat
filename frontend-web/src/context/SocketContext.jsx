@@ -33,6 +33,9 @@ export const SocketProvider = ({ children }) => {
 
     newSocket.on('connect', () => {
       console.log('⚡ Socket connected to server:', newSocket.id);
+      if (currentUser?.id) {
+        newSocket.emit('register_user', { userId: currentUser.id });
+      }
     });
 
     newSocket.on('incoming_call', (data) => {

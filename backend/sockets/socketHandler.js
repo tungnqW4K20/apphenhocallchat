@@ -20,17 +20,28 @@ function setupSockets(io) {
   io.on('connection', (socket) => {
     const userId = Number(socket.handshake.query.userId);
 
-    if (userId && !isNaN(userId)) {
-      socketUsers.set(socket.id, userId);
-      if (!userSockets.has(userId)) {
-        userSockets.set(userId, new Set());
-      }
-      userSockets.get(userId).add(socket.id);
+    const bindUserSocket = (uId) => {
+      if (uId && !isNaN(uId)) {
+        socketUsers.set(socket.id, uId);
+        if (!userSockets.has(uId)) {
+          userSockets.set(uId, new Set());
+        }
+        userSockets.get(uId).add(socket.id);
 
-      // Mark user online
-      dataService.updateUser(userId, { is_online: true }).catch(console.error);
-      io.emit('user_presence_change', { userId, is_online: true });
+        dataService.updateUser(uId, { is_online: true }).catch(console.error);
+        io.emit('user_presence_change', { userId: uId, is_online: true });
+        console.log(`👤 User bound to socket: ${uId} (Socket: ${socket.id})`);
+      }
+    };
+
+    if (userId && !isNaN(userId)) {
+      bindUserSocket(userId);
     }
+
+    socket.on('register_user', (data) => {
+      const uId = Number(data?.userId);
+      bindUserSocket(uId);
+    });
 
     console.log(`⚡ Socket connected: ${socket.id} (User: ${userId || 'Guest'})`);
 
@@ -79,7 +90,12 @@ function setupSockets(io) {
     socket.on('call_user', async (data) => {
       try {
         const { receiverId, callType, offer } = data;
-        const callerId = socketUsers.get(socket.id);
+        let callerId = socketUsers.get(socket.id);
+        if (!callerId && data.callerId) {
+          callerId = Number(data.callerId);
+          bindUserSocket(callerId);
+        }
+
         const caller = await dataService.findUserById(callerId);
         const receiver = await dataService.findUserById(receiverId);
 
@@ -93,7 +109,7 @@ function setupSockets(io) {
         }
 
         // Check if caller has enough coins (minimum 20 coins for 1 min)
-        if ((caller.coins || 0) < 20) {
+        if (caller && caller.gender !== 'female' && (caller.coins || 0) < 20) {
           return socket.emit('call_failed', { message: 'Số dư không đủ để thực hiện cuộc gọi (cần tối thiểu 20 Xu)!' });
         }
 
@@ -107,17 +123,7 @@ function setupSockets(io) {
           });
         }
 
-        // 2. Check if receiver is OFFLINE
-        if (!receiver.is_online) {
-          const suggestions = await dataService.getBusyCallSuggestions(callerId, receiverId, 4);
-          return socket.emit('call_busy', {
-            message: `${receiver.full_name} hiện đang ngoại tuyến!`,
-            busyUser: { id: receiver.id, full_name: receiver.full_name, avatar: receiver.avatar },
-            suggestions
-          });
-        }
-
-        // 3. Receiver is ONLINE & FREE -> Connect call!
+        // 2. Check if receiver is connected via real WebSockets
         const receiverSockets = userSockets.get(Number(receiverId));
         if (receiverSockets && receiverSockets.size > 0) {
           const { password: _, ...callerSafe } = caller;
@@ -129,8 +135,9 @@ function setupSockets(io) {
               offer
             });
           });
-        } else {
-          // Online platform host without 2nd tab -> Auto connect
+          socket.emit('call_ringing', { receiver: { id: receiver.id, full_name: receiver.full_name, avatar: receiver.avatar } });
+        } else if (receiver.is_host && receiver.id <= 22) {
+          // AI Idol Seed Host fallback (only for built-in seed accounts without 2nd tab)
           const hasFree2MinVoucher = await dataService.consumeFreeCallVoucher(callerId);
           const receiverWatermark = securityService.generateCallWatermark(receiver.id, receiver.full_name, receiver.role);
 
@@ -146,6 +153,14 @@ function setupSockets(io) {
           });
 
           startCallBilling(io, socket.id, `host_${receiver.id}`, callerId, receiver.id, callType || 'direct_video', null, hasFree2MinVoucher);
+        } else {
+          // Real registered user who is currently not connected on socket
+          const suggestions = await dataService.getBusyCallSuggestions(callerId, receiverId, 4);
+          return socket.emit('call_busy', {
+            message: `${receiver.full_name} hiện không có kết nối trực tuyến!`,
+            busyUser: { id: receiver.id, full_name: receiver.full_name, avatar: receiver.avatar },
+            suggestions
+          });
         }
       } catch (err) {
         console.error('Socket call_user error:', err);
@@ -218,14 +233,18 @@ function setupSockets(io) {
     // ================= AYARCHAT RANDOM VIDEO MATCH =================
     socket.on('join_random_queue', async (data) => {
       try {
-        const uId = socketUsers.get(socket.id);
+        let uId = socketUsers.get(socket.id);
+        if (!uId && data?.userId) {
+          uId = Number(data.userId);
+          bindUserSocket(uId);
+        }
         if (!uId) return;
 
         const user = await dataService.findUserById(uId);
         if (!user) return;
 
-        // Check if user has coins (at least 20 xu)
-        if ((user.coins || 0) < 20) {
+        // Check if user has coins (at least 20 xu for male users)
+        if (user.gender !== 'female' && (user.coins || 0) < 20) {
           return socket.emit('random_queue_error', { message: 'Bạn cần tối thiểu 20 Xu để bắt đầu ghép đôi video ngẫu nhiên!' });
         }
 
@@ -238,16 +257,22 @@ function setupSockets(io) {
         const { genderFilter = 'all', regionFilter = 'all' } = data || {};
         const targetOppositeGender = user.gender === 'male' ? 'female' : 'male';
 
-        // Find match in queue (Strict Opposite Gender)
+        // Find match in queue
         let matchIndex = -1;
         for (let i = 0; i < randomQueue.length; i++) {
           const candidate = randomQueue[i];
           if (candidate.userId === uId || candidate.socketId === socket.id) continue;
 
-          if (candidate.user.gender === targetOppositeGender) {
+          // Priority 1: Match opposite gender
+          if (candidate.user.gender === targetOppositeGender || candidate.user.gender !== user.gender) {
             matchIndex = i;
             break;
           }
+        }
+
+        // Fallback: If only 2 users in queue, match them immediately
+        if (matchIndex === -1 && randomQueue.length > 0) {
+          matchIndex = 0;
         }
 
         if (matchIndex !== -1) {
