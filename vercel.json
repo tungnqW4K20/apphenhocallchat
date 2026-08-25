@@ -1,7 +1,7 @@
 {
-  "buildCommand": "cd frontend-web && npm install && npm run build",
-  "outputDirectory": "frontend-web/dist",
   "framework": "vite",
+  "buildCommand": "cd frontend-web && npm install --legacy-peer-deps --no-audit && npm run build",
+  "outputDirectory": "frontend-web/dist",
   "rewrites": [
     {
       "source": "/(.*)",
