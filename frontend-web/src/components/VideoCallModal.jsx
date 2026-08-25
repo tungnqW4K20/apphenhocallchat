@@ -265,6 +265,27 @@ export const VideoCallModal = ({ onOpenReport }) => {
           ))}
         </div>
 
+        {/* Anti-Capture Dynamic Watermark Overlay */}
+        <div 
+          className="absolute pointer-events-none z-30 opacity-25 text-[11px] font-black text-white bg-black/50 backdrop-blur-md px-3 py-1 rounded-full border border-white/20 select-none transition-all duration-1000 shadow-xl"
+          style={{ top: watermarkPos.top, left: watermarkPos.left }}
+        >
+          🔒 AyarFlame DRM • {currentUser?.username} • ID: {currentUser?.id}
+        </div>
+
+        {/* Anti-Screen Recording / Anti-Screenshot Privacy Shield */}
+        {isBlurredByPrivacy && (
+          <div className="absolute inset-0 bg-black/95 backdrop-blur-3xl z-40 flex flex-col items-center justify-center p-6 text-center animate-fade-in select-none">
+            <div className="w-16 h-16 rounded-3xl bg-rose-500/20 border border-rose-500/40 text-rose-400 flex items-center justify-center mb-4 animate-pulse">
+              <ShieldAlert className="w-8 h-8" />
+            </div>
+            <h3 className="text-lg font-black text-white">CHỐNG GHI HÌNH & CHỤP ẢNH</h3>
+            <p className="text-xs text-gray-400 max-w-sm mt-2 leading-relaxed">
+              Hệ thống đã tự động làm mờ và bảo vệ luồng video 1v1 để đảm bảo quyền riêng tư tuyệt đối cho cả hai người dùng.
+            </p>
+          </div>
+        )}
+
         {/* Floating In-Call Chat Messages (Always Visible on left screen) */}
         <div className="absolute bottom-28 left-20 z-30 max-w-xs sm:max-w-sm space-y-2 pointer-events-none">
           {inCallMessages.slice(-4).map((msg) => (

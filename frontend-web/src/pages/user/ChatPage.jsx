@@ -36,10 +36,47 @@ export const ChatPage = ({ initialPartner, onOpenProfile, onOpenGift }) => {
   const [search, setSearch] = useState('');
   const [activeMenuMsgId, setActiveMenuMsgId] = useState(null);
   const [showDeleteConvModal, setShowDeleteConvModal] = useState(false);
-  const [actionLoading, setActionLoading] = useState(false);
+  const [isPrivacyProtected, setIsPrivacyProtected] = useState(false);
+  const [screenshotBlockedNotice, setScreenshotBlockedNotice] = useState(false);
 
-  const messagesEndRef = useRef(null);
-  const fileInputRef = useRef(null);
+  // Anti-Screenshot & Screen Capture Protection for Chat
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (
+        e.key === 'PrintScreen' || 
+        (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'S' || e.key === 'C')) ||
+        (e.metaKey && e.shiftKey && (e.key === '3' || e.key === '4' || e.key === '5')) ||
+        e.key === 'F12'
+      ) {
+        e.preventDefault();
+        setScreenshotBlockedNotice(true);
+        setTimeout(() => setScreenshotBlockedNotice(false), 3000);
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        setIsPrivacyProtected(true);
+      } else {
+        setIsPrivacyProtected(false);
+      }
+    };
+
+    const handleWindowBlur = () => setIsPrivacyProtected(true);
+    const handleWindowFocus = () => setIsPrivacyProtected(false);
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('blur', handleWindowBlur);
+    window.addEventListener('focus', handleWindowFocus);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('blur', handleWindowBlur);
+      window.removeEventListener('focus', handleWindowFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
 
   useEffect(() => {
     loadMatchesAndConversations();
@@ -551,11 +588,27 @@ export const ChatPage = ({ initialPartner, onOpenProfile, onOpenGift }) => {
 
               </div>
 
+              {/* Anti-Screenshot Alert Notice */}
+              {screenshotBlockedNotice && (
+                <div className="bg-rose-600/90 text-white text-xs font-bold px-4 py-2 text-center animate-bounce flex items-center justify-center gap-2 z-20">
+                  <ShieldAlert className="w-4 h-4" />
+                  <span>BẢO MẬT: Cuộc trò chuyện được mã hóa & bảo vệ chống chụp màn hình / quay video!</span>
+                </div>
+              )}
+
               {/* Messages Body */}
               <div 
-                className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar"
+                className={`flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar min-h-0 relative select-none ${isPrivacyProtected ? 'filter blur-2xl opacity-10 transition-all duration-200 pointer-events-none' : ''}`}
+                style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
+                onContextMenu={(e) => e.preventDefault()}
                 onClick={() => setActiveMenuMsgId(null)}
               >
+                {/* Floating Anti-Capture Watermark */}
+                <div className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-5 select-none overflow-hidden rotate-[-25deg]">
+                  <p className="text-xl font-black text-white whitespace-nowrap">
+                    AyarFlame Private Chat • {currentUser?.username} • ID: {currentUser?.id}
+                  </p>
+                </div>
                 {loadingMessages ? (
                   <div className="flex items-center justify-center h-full text-xs text-gray-500">
                     Đang tải tin nhắn...
