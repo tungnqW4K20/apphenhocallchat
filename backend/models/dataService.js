@@ -1642,6 +1642,9 @@ class DataService {
       return (a.distance_km || 999) - (b.distance_km || 999);
     });
 
+    return fullCandidates.slice(0, limit);
+  }
+
   // ====================== REAL-TIME CHAT & MESSENGER SYSTEM ======================
   async getUserConversations(userId) {
     userId = Number(userId);
