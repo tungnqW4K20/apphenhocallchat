@@ -103,13 +103,9 @@ function setupSockets(io) {
           return socket.emit('call_failed', { message: 'Người dùng không tồn tại' });
         }
 
-        // Strict Opposite Gender Rule: Men only call Women, Women only call Men
-        if (caller && receiver && caller.gender === receiver.gender) {
-          return socket.emit('call_failed', { message: 'Hệ thống chỉ hỗ trợ gọi video/thoại cho người dùng khác giới tính!' });
-        }
-
-        // Check if caller has enough coins (minimum 20 coins for 1 min)
-        if (caller && caller.gender !== 'female' && (caller.coins || 0) < 20) {
+        // Check if caller has enough coins (minimum 20 coins for 1 min), free for admin and female accounts
+        const isFreeCaller = caller?.role === 'admin' || caller?.gender === 'female';
+        if (caller && !isFreeCaller && (caller.coins || 0) < 20) {
           return socket.emit('call_failed', { message: 'Số dư không đủ để thực hiện cuộc gọi (cần tối thiểu 20 Xu)!' });
         }
 

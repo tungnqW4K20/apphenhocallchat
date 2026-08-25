@@ -203,6 +203,11 @@ export const WebRTCProvider = ({ children }) => {
       }
     });
 
+    socket.on('call_failed', (data) => {
+      alert(data.message || 'Không thể thực hiện cuộc gọi.');
+      cleanupCall();
+    });
+
     socket.on('call_rejected', (data) => {
       alert(data.reason || 'Cuộc gọi đã bị từ chối.');
       cleanupCall();
