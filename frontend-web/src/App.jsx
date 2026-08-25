@@ -80,7 +80,7 @@ function AppContent() {
       />
 
       {/* Main Content Area */}
-      <main className="flex-1 pb-24 md:pb-6">
+      <main className={`flex-1 ${activeTab === 'chat' ? 'pb-14 md:pb-6' : 'pb-24 md:pb-6'}`}>
         
         {/* ADMIN MODE */}
         {isAdminMode && currentUser?.role === 'admin' ? (
