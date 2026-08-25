@@ -36,8 +36,12 @@ export const ChatPage = ({ initialPartner, onOpenProfile, onOpenGift }) => {
   const [search, setSearch] = useState('');
   const [activeMenuMsgId, setActiveMenuMsgId] = useState(null);
   const [showDeleteConvModal, setShowDeleteConvModal] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
   const [isPrivacyProtected, setIsPrivacyProtected] = useState(false);
   const [screenshotBlockedNotice, setScreenshotBlockedNotice] = useState(false);
+
+  const messagesEndRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   // Anti-Screenshot & Screen Capture Protection for Chat
   useEffect(() => {
