@@ -727,11 +727,35 @@ export const ChatPage = ({ initialPartner, onOpenProfile, onOpenGift }) => {
                     );
                   })
                 )}
+                {uploadingImage && (
+                  <div className="flex items-end gap-2 justify-end animate-pulse">
+                    <div className="max-w-[75%] rounded-2xl rounded-br-none px-4 py-3 bg-gradient-to-r from-rose-500/80 to-pink-600/80 text-white shadow-lg flex items-center gap-2.5 text-xs">
+                      <Loader2 className="w-4 h-4 animate-spin text-white" />
+                      <span>Đang tối ưu & gửi tệp đa phương tiện...</span>
+                    </div>
+                  </div>
+                )}
                 <div ref={messagesEndRef} />
               </div>
 
+              {/* Quick Emojis Bar */}
+              <div className="px-3 py-1.5 bg-[#111019] border-t border-white/5 flex items-center gap-1 overflow-x-auto custom-scrollbar shrink-0">
+                {['❤️', '🔥', '😘', '🌹', '🥰', '✨', '👍', '😂', '👋', '☕'].map((emoji) => (
+                  <button
+                    key={emoji}
+                    type="button"
+                    onClick={() => {
+                      setInputText(prev => prev + emoji);
+                    }}
+                    className="p-1 hover:scale-125 transition-transform text-sm select-none"
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+
               {/* Message Input Bar */}
-              <form onSubmit={handleSendMessage} className="p-2.5 sm:p-4 bg-[#111019] border-t border-white/10 flex items-center gap-2 shrink-0">
+              <form onSubmit={handleSendMessage} className="p-2 sm:p-3 bg-[#111019] border-t border-white/10 flex items-center gap-2 shrink-0">
                 <input
                   type="file"
                   ref={fileInputRef}
@@ -744,25 +768,25 @@ export const ChatPage = ({ initialPartner, onOpenProfile, onOpenGift }) => {
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
                   disabled={uploadingImage}
-                  className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition-all disabled:opacity-50 flex items-center justify-center"
-                  title="Gửi ảnh miễn phí"
+                  className="p-2.5 rounded-2xl bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition-all disabled:opacity-50 flex items-center justify-center shrink-0"
+                  title="Gửi ảnh hoặc video"
                 >
                   {uploadingImage ? <Loader2 className="w-4 h-4 animate-spin text-rose-500" /> : <ImageIcon className="w-4 h-4" />}
                 </button>
 
                 <input
                   type="text"
-                  placeholder={uploadingImage ? "Đang tải ảnh lên đám mây..." : "Nhập tin nhắn..."}
+                  placeholder={uploadingImage ? "Đang gửi ảnh..." : "Nhập tin nhắn..."}
                   value={inputText}
                   disabled={uploadingImage}
                   onChange={(e) => setInputText(e.target.value)}
-                  className="flex-1 px-4 py-2.5 bg-white/5 border border-white/10 rounded-2xl text-xs sm:text-sm text-white placeholder-gray-500 focus:outline-none focus:border-rose-500"
+                  className="flex-1 px-4 py-2.5 bg-white/5 border border-white/10 rounded-2xl text-xs sm:text-sm text-white placeholder-gray-500 focus:outline-none focus:border-rose-500 transition-colors"
                 />
 
                 <button
                   type="submit"
                   disabled={!inputText.trim() || uploadingImage}
-                  className="p-2.5 rounded-2xl bg-gradient-to-r from-rose-500 to-pink-600 text-white shadow-lg shadow-rose-500/25 hover:opacity-95 active:scale-95 disabled:opacity-40 transition-all"
+                  className="p-2.5 rounded-2xl bg-gradient-to-r from-rose-500 to-pink-600 text-white shadow-lg shadow-rose-500/25 hover:opacity-95 active:scale-95 disabled:opacity-40 transition-all shrink-0"
                 >
                   <Send className="w-4 h-4" />
                 </button>
