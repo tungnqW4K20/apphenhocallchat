@@ -1,9 +1,0 @@
-{
-  "name": "apphenhocallchat-monorepo",
-  "version": "1.0.0",
-  "private": true,
-  "scripts": {
-    "build": "cd frontend-web && npm install && npm run build",
-    "start": "cd backend && npm start"
-  }
-}
