@@ -187,8 +187,8 @@ export const Navbar = ({ activeTab, setActiveTab, onOpenShop, onOpenAuth, onOpen
                   onClick={() => setActiveTab('profile')}
                   className="flex items-center gap-1.5 p-0.5 sm:p-1 sm:pl-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-full cursor-pointer transition-all shrink-0"
                 >
-                  <span className="text-xs font-semibold text-gray-200 max-w-[80px] truncate hidden md:inline">
-                    {currentUser.full_name?.split(' ')[0]}
+                  <span className="text-xs font-semibold text-gray-200 max-w-[140px] truncate hidden md:inline">
+                    {currentUser.full_name || currentUser.username}
                   </span>
                   <div className="relative shrink-0 w-8 h-8">
                     <img

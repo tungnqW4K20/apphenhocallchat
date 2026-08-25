@@ -76,6 +76,35 @@ export const WebRTCProvider = ({ children }) => {
   const callPartnerRef = useRef(null);
   const callTypeRef = useRef('video');
 
+  const incomingIceCandidatesQueueRef = useRef([]);
+
+  const addOrQueueIceCandidate = async (candidate) => {
+    if (!candidate) return;
+    if (!peerConnectionRef.current || !peerConnectionRef.current.remoteDescription) {
+      incomingIceCandidatesQueueRef.current.push(candidate);
+      return;
+    }
+    try {
+      await peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(candidate));
+    } catch (e) {
+      console.warn('Add ice candidate error:', e);
+    }
+  };
+
+  const flushIncomingIceCandidates = async () => {
+    if (peerConnectionRef.current && peerConnectionRef.current.remoteDescription && incomingIceCandidatesQueueRef.current.length > 0) {
+      const candidates = [...incomingIceCandidatesQueueRef.current];
+      incomingIceCandidatesQueueRef.current = [];
+      for (const cand of candidates) {
+        try {
+          await peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(cand));
+        } catch (e) {
+          console.warn('Flush incoming candidate error:', e);
+        }
+      }
+    }
+  };
+
   const flushPendingIceCandidates = (targetSocketId) => {
     if (targetSocketId && socket && pendingIceCandidatesRef.current.length > 0) {
       pendingIceCandidatesRef.current.forEach(candidate => {
@@ -121,6 +150,7 @@ export const WebRTCProvider = ({ children }) => {
       if (peerConnectionRef.current && data.answer) {
         try {
           await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(data.answer));
+          await flushIncomingIceCandidates();
         } catch (e) {
           console.warn('Set remote desc error:', e);
         }
@@ -133,6 +163,7 @@ export const WebRTCProvider = ({ children }) => {
       if (peerConnectionRef.current) {
         try {
           await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(data.offer));
+          await flushIncomingIceCandidates();
           const answer = await peerConnectionRef.current.createAnswer();
           await peerConnectionRef.current.setLocalDescription(answer);
           socket.emit('webrtc_answer', {
@@ -151,6 +182,7 @@ export const WebRTCProvider = ({ children }) => {
       if (peerConnectionRef.current && data.answer) {
         try {
           await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(data.answer));
+          await flushIncomingIceCandidates();
         } catch (e) {
           console.warn('Handle webrtc_answer error:', e);
         }
@@ -158,22 +190,14 @@ export const WebRTCProvider = ({ children }) => {
     });
 
     socket.on('webrtc_ice_candidate', async (data) => {
-      if (peerConnectionRef.current && data.candidate) {
-        try {
-          await peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(data.candidate));
-        } catch (e) {
-          console.warn('Add ice candidate error:', e);
-        }
+      if (data.candidate) {
+        await addOrQueueIceCandidate(data.candidate);
       }
     });
 
     socket.on('ice_candidate', async (data) => {
-      if (peerConnectionRef.current && data.candidate) {
-        try {
-          await peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(data.candidate));
-        } catch (e) {
-          console.warn('Add ice candidate error:', e);
-        }
+      if (data.candidate) {
+        await addOrQueueIceCandidate(data.candidate);
       }
     });
 
@@ -552,6 +576,7 @@ export const WebRTCProvider = ({ children }) => {
     try {
       if (callData.offer) {
         await pc.setRemoteDescription(new RTCSessionDescription(callData.offer));
+        await flushIncomingIceCandidates();
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
 
