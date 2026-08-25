@@ -14,6 +14,7 @@ const ICE_SERVERS = {
     { urls: 'stun:stun3.l.google.com:19302' },
     { urls: 'stun:stun4.l.google.com:19302' },
     { urls: 'stun:stun.cloudflare.com:3478' },
+    { urls: 'stun:stun.services.mozilla.com' },
     { urls: 'stun:openrelay.metered.ca:80' },
     {
       urls: 'turn:openrelay.metered.ca:80',
@@ -30,7 +31,8 @@ const ICE_SERVERS = {
       username: 'openrelayproject',
       credential: 'openrelayproject'
     }
-  ]
+  ],
+  iceCandidatePoolSize: 10
 };
 
 export const WebRTCProvider = ({ children }) => {
