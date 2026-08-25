@@ -37,6 +37,11 @@ const sendMessage = async (req, res) => {
       metadata || {}
     );
 
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('new_message', newMsg);
+    }
+
     return res.status(201).json({ success: true, message: newMsg });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
@@ -50,14 +55,15 @@ const uploadChatMedia = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Không có tệp tải lên' });
     }
     const mediaUrl = `/uploads/${file.filename}`;
-    const fullUrl = `http://localhost:5001${mediaUrl}`;
+    const fullUrl = `https://dating-backend-islg.onrender.com${mediaUrl}`;
+    const isVideo = file.mimetype.startsWith('video');
     const isAudio = file.mimetype.startsWith('audio');
 
     return res.json({
       success: true,
       mediaUrl,
       url: fullUrl,
-      type: isAudio ? 'audio' : 'image'
+      type: isVideo ? 'video' : isAudio ? 'audio' : 'image'
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });

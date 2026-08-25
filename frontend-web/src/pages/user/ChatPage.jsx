@@ -225,24 +225,40 @@ export const ChatPage = ({ initialPartner, onOpenProfile, onOpenGift }) => {
 
     setUploadingImage(true);
     try {
-      const uploadRes = await uploadImageFree(file);
-      if (uploadRes.success && uploadRes.url) {
-        const imageUrl = uploadRes.url;
+      const isVideo = file.type.startsWith('video');
+      let mediaUrl = null;
 
-        // Send via socket or REST API
+      if (!isVideo) {
+        const uploadRes = await uploadImageFree(file);
+        if (uploadRes.success && uploadRes.url) {
+          mediaUrl = uploadRes.url;
+        }
+      }
+
+      if (!mediaUrl) {
+        const formData = new FormData();
+        formData.append('file', file);
+        const res = await api.uploadChatMedia(formData);
+        if (res.success && (res.url || res.mediaUrl)) {
+          mediaUrl = res.url || res.mediaUrl;
+        }
+      }
+
+      if (mediaUrl) {
+        const messageType = isVideo ? 'video' : 'image';
         if (socket) {
           socket.emit('send_message', {
             conversationId: activeConv.id,
             receiverId: activeConv.partner_id,
-            messageType: 'image',
-            content: imageUrl
+            messageType,
+            content: mediaUrl
           });
         } else {
           const res = await api.sendMessage({
             conversation_id: activeConv.id,
             receiver_id: activeConv.partner_id,
-            message_type: 'image',
-            content: imageUrl
+            message_type: messageType,
+            content: mediaUrl
           });
           if (res.success) {
             setMessages(prev => [...prev, res.message]);
@@ -250,11 +266,11 @@ export const ChatPage = ({ initialPartner, onOpenProfile, onOpenGift }) => {
           }
         }
       } else {
-        alert('Không thể tải ảnh: ' + (uploadRes.error || 'Lỗi kết nối'));
+        alert('Không thể tải tệp lên. Vui lòng thử lại!');
       }
     } catch (err) {
       console.error('Upload chat media error:', err);
-      alert('Lỗi tải ảnh lên: ' + err.message);
+      alert('Lỗi tải tệp: ' + err.message);
     } finally {
       setUploadingImage(false);
       if (fileInputRef.current) {
@@ -609,6 +625,15 @@ export const ChatPage = ({ initialPartner, onOpenProfile, onOpenGift }) => {
                                 onClick={() => window.open(getImageSrc(m.content), '_blank')}
                               />
                             </div>
+                          ) : m.message_type === 'video' ? (
+                            <div className="rounded-xl overflow-hidden my-1 bg-black/60 max-w-xs sm:max-w-sm">
+                              <video
+                                src={getImageSrc(m.content)}
+                                controls
+                                playsInline
+                                className="max-h-72 w-full rounded-xl object-contain"
+                              />
+                            </div>
                           ) : m.message_type === 'gift' ? (
                             <div className="flex items-center gap-2">
                               <span className="text-2xl">🎁</span>
@@ -636,7 +661,7 @@ export const ChatPage = ({ initialPartner, onOpenProfile, onOpenGift }) => {
                   type="file"
                   ref={fileInputRef}
                   onChange={handleFileUpload}
-                  accept="image/*"
+                  accept="image/*,video/*"
                   className="hidden"
                 />
 

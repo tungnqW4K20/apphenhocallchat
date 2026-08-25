@@ -1634,7 +1634,158 @@ class DataService {
       return (a.distance_km || 999) - (b.distance_km || 999);
     });
 
-    return fullCandidates.slice(0, limit);
+  // ====================== REAL-TIME CHAT & MESSENGER SYSTEM ======================
+  async getUserConversations(userId) {
+    userId = Number(userId);
+    const store = getMockStore();
+    if (!store.conversations) store.conversations = [];
+    if (!store.messages) store.messages = [];
+
+    const userConvs = store.conversations.filter(c => c.user1_id === userId || c.user2_id === userId);
+    
+    const detailedConvs = await Promise.all(userConvs.map(async (c) => {
+      const partnerId = c.user1_id === userId ? c.user2_id : c.user1_id;
+      const partner = await this.findUserById(partnerId);
+      if (!partner) return null;
+
+      // Get unread count
+      const unreadCount = store.messages.filter(m => m.conversation_id === c.id && m.receiver_id === userId && !m.is_read).length;
+      const photos = await this.getUserPhotos(partner.id);
+      const { password: _, ...safePartner } = partner;
+      safePartner.photos = photos.map(p => p.photo_url);
+
+      return {
+        id: c.id,
+        partner_id: partner.id,
+        partner: safePartner,
+        last_message: c.last_message || '',
+        last_message_at: c.last_message_at || c.created_at,
+        unread_count: unreadCount,
+        created_at: c.created_at
+      };
+    }));
+
+    return detailedConvs.filter(Boolean).sort((a, b) => new Date(b.last_message_at) - new Date(a.last_message_at));
+  }
+
+  async getConversationMessages(conversationId) {
+    conversationId = Number(conversationId);
+    const store = getMockStore();
+    if (!store.messages) store.messages = [];
+
+    const msgs = store.messages.filter(m => m.conversation_id === conversationId);
+    return msgs.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+  }
+
+  async markMessagesAsRead(conversationId, userId) {
+    conversationId = Number(conversationId);
+    userId = Number(userId);
+    const store = getMockStore();
+    if (!store.messages) store.messages = [];
+
+    let updated = false;
+    store.messages.forEach(m => {
+      if (m.conversation_id === conversationId && m.receiver_id === userId && !m.is_read) {
+        m.is_read = true;
+        updated = true;
+      }
+    });
+
+    if (updated) saveStore();
+    return true;
+  }
+
+  async createMessage(conversationId, senderId, receiverId, messageType, content, metadata = {}) {
+    senderId = Number(senderId);
+    receiverId = Number(receiverId);
+    const store = getMockStore();
+    if (!store.conversations) store.conversations = [];
+    if (!store.messages) store.messages = [];
+    if (!store.autoIncrementIds) store.autoIncrementIds = {};
+    if (!store.autoIncrementIds.conversations) store.autoIncrementIds.conversations = 1;
+    if (!store.autoIncrementIds.messages) store.autoIncrementIds.messages = 1;
+
+    let conv = null;
+    if (conversationId && typeof conversationId === 'number') {
+      conv = store.conversations.find(c => c.id === Number(conversationId));
+    }
+
+    if (!conv) {
+      conv = store.conversations.find(c =>
+        (c.user1_id === senderId && c.user2_id === receiverId) ||
+        (c.user1_id === receiverId && c.user2_id === senderId)
+      );
+    }
+
+    if (!conv) {
+      conv = {
+        id: store.autoIncrementIds.conversations++,
+        user1_id: Math.min(senderId, receiverId),
+        user2_id: Math.max(senderId, receiverId),
+        last_message: messageType === 'image' ? '[Hình ảnh]' : messageType === 'video' ? '[Video]' : content,
+        last_message_at: new Date().toISOString(),
+        created_at: new Date().toISOString()
+      };
+      store.conversations.push(conv);
+    } else {
+      conv.last_message = messageType === 'image' ? '[Hình ảnh]' : messageType === 'video' ? '[Video]' : content;
+      conv.last_message_at = new Date().toISOString();
+    }
+
+    const newMsg = {
+      id: store.autoIncrementIds.messages++,
+      conversation_id: conv.id,
+      sender_id: senderId,
+      receiver_id: receiverId,
+      message_type: messageType || 'text',
+      content: content,
+      metadata: metadata || {},
+      is_read: false,
+      is_recalled: false,
+      created_at: new Date().toISOString()
+    };
+
+    store.messages.push(newMsg);
+    saveStore();
+
+    return newMsg;
+  }
+
+  async recallMessage(messageId, userId) {
+    messageId = Number(messageId);
+    userId = Number(userId);
+    const store = getMockStore();
+    const msg = (store.messages || []).find(m => m.id === messageId);
+    if (!msg) throw new Error('Không tìm thấy tin nhắn');
+    if (msg.sender_id !== userId) throw new Error('Bạn chỉ có thể thu hồi tin nhắn của chính mình');
+
+    msg.is_recalled = true;
+    msg.content = 'Tin nhắn đã được thu hồi';
+    saveStore();
+    return msg;
+  }
+
+  async deleteMessage(messageId, userId) {
+    messageId = Number(messageId);
+    userId = Number(userId);
+    const store = getMockStore();
+    const msg = (store.messages || []).find(m => m.id === messageId);
+    if (!msg) throw new Error('Không tìm thấy tin nhắn');
+    if (msg.sender_id !== userId && msg.receiver_id !== userId) throw new Error('Bạn không có quyền xóa tin nhắn này');
+
+    store.messages = store.messages.filter(m => m.id !== messageId);
+    saveStore();
+    return msg;
+  }
+
+  async deleteConversation(conversationId, userId) {
+    conversationId = Number(conversationId);
+    userId = Number(userId);
+    const store = getMockStore();
+    store.conversations = (store.conversations || []).filter(c => c.id !== conversationId);
+    store.messages = (store.messages || []).filter(m => m.conversation_id !== conversationId);
+    saveStore();
+    return true;
   }
 }
 
