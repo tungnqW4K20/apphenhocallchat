@@ -159,57 +159,57 @@ export const VideoCallModal = ({ onOpenReport }) => {
         <span>ID:{currentUser?.id} • {currentUser?.full_name?.split(' ')[0]} • AYARFLAME SECURE</span>
       </div>
       
-      {/* Remote Fullscreen Video & Live Face Feed */}
-      <div className="relative w-full h-full flex items-center justify-center bg-zinc-950 overflow-hidden">
+      {/* Remote Fullscreen Video & Live Face Feed (Main Screen - Zalo/FaceTime Style) */}
+      <div className="relative w-full h-full flex items-center justify-center bg-black overflow-hidden">
         
-        {/* Fullscreen Partner Live Camera/Photo Feed with Ambient Motion */}
-        <div className="absolute inset-0 flex items-center justify-center overflow-hidden">
-          {/* Blurred Atmospheric Background */}
-          <div 
-            className="absolute inset-0 scale-125 filter blur-3xl opacity-50 bg-cover bg-center transition-all duration-700"
-            style={{ backgroundImage: `url(${partnerAvatar})` }}
-          />
-
-          {/* High-Definition Center Portrait Video Feed */}
-          <div className="relative w-full h-full max-w-2xl flex flex-col items-center justify-center">
-            <img
-              src={partnerAvatar}
-              alt={callPartner.full_name}
-              className={`w-full h-full object-cover sm:object-contain transition-all duration-500 ${
-                beautyFilter ? 'brightness-110 contrast-105 saturate-110' : ''
-              }`}
-            />
-
-            {/* Live Camera Broadcast Vignette & Gradients */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/60 pointer-events-none" />
-
-            {/* Live Camera Status Badge */}
-            <div className="absolute top-20 left-6 z-20 flex items-center gap-2 px-3 py-1 rounded-full bg-black/60 backdrop-blur-md border border-white/10 shadow-lg">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
-              <span className="text-[11px] font-bold text-white tracking-wide">1080P HD 60FPS</span>
-              <Volume2 className="w-3.5 h-3.5 text-rose-400 animate-pulse ml-1" />
-            </div>
-
-            {/* Live Soundwave Visualizer on Bottom Left */}
-            <div className="absolute bottom-28 left-6 z-20 flex items-end gap-1 pointer-events-none">
-              <span className="w-1 h-3 bg-rose-500 rounded-full animate-bounce [animation-delay:0ms]" />
-              <span className="w-1 h-6 bg-pink-400 rounded-full animate-bounce [animation-delay:150ms]" />
-              <span className="w-1 h-4 bg-purple-400 rounded-full animate-bounce [animation-delay:300ms]" />
-              <span className="w-1 h-7 bg-rose-400 rounded-full animate-bounce [animation-delay:75ms]" />
-              <span className="w-1 h-5 bg-pink-500 rounded-full animate-bounce [animation-delay:200ms]" />
-            </div>
-          </div>
-        </div>
-
-        {/* WebRTC Video Track (Full Screen Live Video of Partner) */}
+        {/* WebRTC Video Track (Full Screen Live Camera of Partner) */}
         <video
           ref={remoteVideoRef}
           autoPlay
           playsInline
-          className={`absolute inset-0 w-full h-full object-cover z-10 transition-opacity duration-300 ${
+          className={`absolute inset-0 w-full h-full object-cover z-20 transition-opacity duration-300 ${
             remoteStream ? 'opacity-100' : 'opacity-0 pointer-events-none'
           } ${beautyFilter ? 'brightness-105 contrast-105 saturate-110' : ''}`}
         />
+
+        {/* Fallback Partner Portrait & Blurred Background (Shown only before WebRTC stream connects) */}
+        <div className={`absolute inset-0 flex items-center justify-center overflow-hidden z-10 ${remoteStream ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
+          <div 
+            className="absolute inset-0 scale-125 filter blur-3xl opacity-60 bg-cover bg-center"
+            style={{ backgroundImage: `url(${partnerAvatar})` }}
+          />
+
+          <img
+            src={partnerAvatar}
+            alt={callPartner.full_name}
+            className="w-full h-full object-cover transition-all duration-500"
+          />
+
+          {/* Connecting Camera Notice */}
+          <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center p-6 text-center space-y-3 z-10">
+            <div className="w-16 h-16 rounded-full border-4 border-rose-500 border-t-transparent animate-spin" />
+            <p className="text-sm font-bold text-white shadow">Đang đồng bộ luồng Camera HD với {callPartner.full_name}...</p>
+          </div>
+        </div>
+
+        {/* Live Camera Broadcast Vignette & Gradients */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/60 pointer-events-none z-25" />
+
+        {/* Live Camera Status Badge */}
+        <div className="absolute top-20 left-6 z-30 flex items-center gap-2 px-3 py-1 rounded-full bg-black/60 backdrop-blur-md border border-white/10 shadow-lg">
+          <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
+          <span className="text-[11px] font-bold text-white tracking-wide">1080P HD 60FPS</span>
+          <Volume2 className="w-3.5 h-3.5 text-rose-400 animate-pulse ml-1" />
+        </div>
+
+        {/* Live Soundwave Visualizer on Bottom Left */}
+        <div className="absolute bottom-28 left-6 z-30 flex items-end gap-1 pointer-events-none">
+          <span className="w-1 h-3 bg-rose-500 rounded-full animate-bounce [animation-delay:0ms]" />
+          <span className="w-1 h-6 bg-pink-400 rounded-full animate-bounce [animation-delay:150ms]" />
+          <span className="w-1 h-4 bg-purple-400 rounded-full animate-bounce [animation-delay:300ms]" />
+          <span className="w-1 h-7 bg-rose-400 rounded-full animate-bounce [animation-delay:75ms]" />
+          <span className="w-1 h-5 bg-pink-500 rounded-full animate-bounce [animation-delay:200ms]" />
+        </div>
 
         {/* Floating Gift Animations Overlay */}
         <div className="absolute inset-0 pointer-events-none z-30 overflow-hidden">

@@ -10,7 +10,10 @@ const ICE_SERVERS = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
-    { urls: 'stun:stun2.l.google.com:19302' }
+    { urls: 'stun:stun2.l.google.com:19302' },
+    { urls: 'stun:stun3.l.google.com:19302' },
+    { urls: 'stun:stun4.l.google.com:19302' },
+    { urls: 'stun:global.stun.twilio.com:3478' }
   ]
 };
 
@@ -50,11 +53,24 @@ export const WebRTCProvider = ({ children }) => {
   const remoteStreamRef = useRef(null);
   const peerConnectionRef = useRef(null);
   const partnerSocketIdRef = useRef(null);
+  const pendingIceCandidatesRef = useRef([]);
   const callSessionIdRef = useRef(null);
   const durationTimerRef = useRef(null);
   const billingTimerRef = useRef(null);
   const callPartnerRef = useRef(null);
   const callTypeRef = useRef('video');
+
+  const flushPendingIceCandidates = (targetSocketId) => {
+    if (targetSocketId && socket && pendingIceCandidatesRef.current.length > 0) {
+      pendingIceCandidatesRef.current.forEach(candidate => {
+        socket.emit('webrtc_ice_candidate', {
+          targetSocketId,
+          candidate
+        });
+      });
+      pendingIceCandidatesRef.current = [];
+    }
+  };
 
   useEffect(() => {
     callPartnerRef.current = callPartner;
@@ -85,11 +101,52 @@ export const WebRTCProvider = ({ children }) => {
 
     socket.on('call_accepted', async (data) => {
       partnerSocketIdRef.current = data.receiverSocketId;
+      flushPendingIceCandidates(data.receiverSocketId);
       if (peerConnectionRef.current && data.answer) {
         try {
           await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(data.answer));
         } catch (e) {
           console.warn('Set remote desc error:', e);
+        }
+      }
+    });
+
+    socket.on('webrtc_offer', async (data) => {
+      partnerSocketIdRef.current = data.fromSocketId;
+      flushPendingIceCandidates(data.fromSocketId);
+      if (peerConnectionRef.current) {
+        try {
+          await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(data.offer));
+          const answer = await peerConnectionRef.current.createAnswer();
+          await peerConnectionRef.current.setLocalDescription(answer);
+          socket.emit('webrtc_answer', {
+            targetSocketId: data.fromSocketId,
+            answer
+          });
+        } catch (e) {
+          console.warn('Handle webrtc_offer error:', e);
+        }
+      }
+    });
+
+    socket.on('webrtc_answer', async (data) => {
+      partnerSocketIdRef.current = data.fromSocketId;
+      flushPendingIceCandidates(data.fromSocketId);
+      if (peerConnectionRef.current && data.answer) {
+        try {
+          await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(data.answer));
+        } catch (e) {
+          console.warn('Handle webrtc_answer error:', e);
+        }
+      }
+    });
+
+    socket.on('webrtc_ice_candidate', async (data) => {
+      if (peerConnectionRef.current && data.candidate) {
+        try {
+          await peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(data.candidate));
+        } catch (e) {
+          console.warn('Add ice candidate error:', e);
         }
       }
     });
@@ -145,15 +202,15 @@ export const WebRTCProvider = ({ children }) => {
       setIsInCall(true);
 
       const stream = await initializeMedia(true);
-      await createPeerConnection(stream);
+      const pc = await createPeerConnection(stream);
 
       if (data.isInitiator) {
         try {
-          const offer = await peerConnectionRef.current.createOffer();
-          await peerConnectionRef.current.setLocalDescription(offer);
-          socket.emit('call_user', {
-            receiverId: data.partner.id,
-            callType: 'random_video',
+          const offer = await pc.createOffer();
+          await pc.setLocalDescription(offer);
+          flushPendingIceCandidates(data.partnerSocketId);
+          socket.emit('webrtc_offer', {
+            targetSocketId: data.partnerSocketId,
             offer
           });
         } catch (err) {
@@ -184,6 +241,9 @@ export const WebRTCProvider = ({ children }) => {
 
     return () => {
       socket.off('call_accepted');
+      socket.off('webrtc_offer');
+      socket.off('webrtc_answer');
+      socket.off('webrtc_ice_candidate');
       socket.off('ice_candidate');
       socket.off('call_rejected');
       socket.off('call_ended');
@@ -329,19 +389,29 @@ export const WebRTCProvider = ({ children }) => {
     }
 
     pc.onicecandidate = (event) => {
-      if (event.candidate && partnerSocketIdRef.current && socket) {
-        socket.emit('ice_candidate', {
-          targetSocketId: partnerSocketIdRef.current,
-          candidate: event.candidate
-        });
+      if (event.candidate) {
+        if (partnerSocketIdRef.current && socket) {
+          socket.emit('webrtc_ice_candidate', {
+            targetSocketId: partnerSocketIdRef.current,
+            candidate: event.candidate
+          });
+          socket.emit('ice_candidate', {
+            targetSocketId: partnerSocketIdRef.current,
+            candidate: event.candidate
+          });
+        } else {
+          pendingIceCandidatesRef.current.push(event.candidate);
+        }
       }
     };
 
     pc.ontrack = (event) => {
+      console.log('🎥 Live Remote Media Stream Received:', event.streams[0]);
       remoteStreamRef.current = event.streams[0];
       setRemoteStream(event.streams[0]);
       if (remoteVideoRef.current) {
         remoteVideoRef.current.srcObject = event.streams[0];
+        remoteVideoRef.current.play().catch(() => {});
       }
     };
 
@@ -468,6 +538,8 @@ export const WebRTCProvider = ({ children }) => {
         await pc.setRemoteDescription(new RTCSessionDescription(callData.offer));
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
+
+        flushPendingIceCandidates(callData.callerSocketId);
 
         socket.emit('answer_call', {
           callerSocketId: callData.callerSocketId,

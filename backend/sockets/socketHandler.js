@@ -216,10 +216,46 @@ function setupSockets(io) {
 
     socket.on('ice_candidate', (data) => {
       const { targetSocketId, candidate } = data;
-      io.to(targetSocketId).emit('ice_candidate', {
-        candidate,
-        fromSocketId: socket.id
-      });
+      if (targetSocketId) {
+        io.to(targetSocketId).emit('ice_candidate', {
+          candidate,
+          fromSocketId: socket.id
+        });
+        io.to(targetSocketId).emit('webrtc_ice_candidate', {
+          candidate,
+          fromSocketId: socket.id
+        });
+      }
+    });
+
+    socket.on('webrtc_offer', (data) => {
+      const { targetSocketId, offer } = data;
+      if (targetSocketId) {
+        io.to(targetSocketId).emit('webrtc_offer', {
+          offer,
+          fromSocketId: socket.id
+        });
+      }
+    });
+
+    socket.on('webrtc_answer', (data) => {
+      const { targetSocketId, answer } = data;
+      if (targetSocketId) {
+        io.to(targetSocketId).emit('webrtc_answer', {
+          answer,
+          fromSocketId: socket.id
+        });
+      }
+    });
+
+    socket.on('webrtc_ice_candidate', (data) => {
+      const { targetSocketId, candidate } = data;
+      if (targetSocketId) {
+        io.to(targetSocketId).emit('webrtc_ice_candidate', {
+          candidate,
+          fromSocketId: socket.id
+        });
+      }
     });
 
     socket.on('end_call', async (data) => {
