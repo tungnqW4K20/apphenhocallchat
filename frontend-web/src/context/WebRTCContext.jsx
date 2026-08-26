@@ -52,6 +52,7 @@ export const WebRTCProvider = ({ children }) => {
   // Streams state for reliable UI attachment
   const [localStream, setLocalStream] = useState(null);
   const [remoteStream, setRemoteStream] = useState(null);
+  const [hostLiveVideoUrl, setHostLiveVideoUrl] = useState(null);
 
   // Random Queue State
   const [isSearchingQueue, setIsSearchingQueue] = useState(false);
@@ -78,7 +79,6 @@ export const WebRTCProvider = ({ children }) => {
   const callPartnerRef = useRef(null);
   const callTypeRef = useRef('video');
   const simulatedIntervalsRef = useRef([]);
-  const hostVideoElementRef = useRef(null);
 
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
@@ -251,66 +251,11 @@ export const WebRTCProvider = ({ children }) => {
     return stream;
   };
 
-  // Helper: Create Realistic High-Definition Video Stream for AI Idol Hosts
-  const createHostLiveStream = (hostUser) => {
+  const setHostDirectVideo = (hostUser) => {
     const isFemale = hostUser?.gender === 'female';
     const videoList = isFemale ? HOST_LIVE_VIDEOS.female : HOST_LIVE_VIDEOS.male;
     const videoUrl = videoList[Math.abs(Number(hostUser?.id || 1)) % videoList.length];
-
-    if (hostVideoElementRef.current) {
-      try {
-        hostVideoElementRef.current.pause();
-        hostVideoElementRef.current.src = '';
-      } catch (e) {}
-    }
-
-    const hostVideo = document.createElement('video');
-    hostVideo.src = videoUrl;
-    hostVideo.crossOrigin = 'anonymous';
-    hostVideo.loop = true;
-    hostVideo.muted = true;
-    hostVideo.playsInline = true;
-    hostVideo.autoplay = true;
-    hostVideoElementRef.current = hostVideo;
-
-    const attachStreamFromVideo = () => {
-      let stream = null;
-      if (hostVideo.captureStream) {
-        stream = hostVideo.captureStream(30);
-      } else if (hostVideo.mozCaptureStream) {
-        stream = hostVideo.mozCaptureStream(30);
-      }
-
-      if (stream && stream.getVideoTracks().length > 0) {
-        remoteStreamRef.current = stream;
-        setRemoteStream(stream);
-        if (remoteVideoRef.current) {
-          remoteVideoRef.current.srcObject = stream;
-          remoteVideoRef.current.play().catch(() => {});
-        }
-      } else {
-        const canvasStream = createSimulatedMediaStream(hostUser, 'IDOL LIVE 1080P HD');
-        remoteStreamRef.current = canvasStream;
-        setRemoteStream(canvasStream);
-        if (remoteVideoRef.current) {
-          remoteVideoRef.current.srcObject = canvasStream;
-          remoteVideoRef.current.play().catch(() => {});
-        }
-      }
-    };
-
-    hostVideo.play().then(() => {
-      attachStreamFromVideo();
-    }).catch((err) => {
-      console.warn('Host video play error, using fallback animated stream:', err);
-      const canvasStream = createSimulatedMediaStream(hostUser, 'IDOL LIVE 1080P HD');
-      remoteStreamRef.current = canvasStream;
-      setRemoteStream(canvasStream);
-      if (remoteVideoRef.current) {
-        remoteVideoRef.current.srcObject = canvasStream;
-        remoteVideoRef.current.play().catch(() => {});
-      }
-    });
+    setHostLiveVideoUrl(videoUrl);
   };
 
   const initializeMedia = async (isVideo = true) => {
@@ -494,7 +439,7 @@ export const WebRTCProvider = ({ children }) => {
         // AI Idol Host mode (seed accounts) -> generate high-res live video stream
         const partnerToUse = callPartnerRef.current || callPartner;
         if (partnerToUse) {
-          createHostLiveStream(partnerToUse);
+          setHostDirectVideo(partnerToUse);
         }
       }
     });
@@ -617,10 +562,12 @@ export const WebRTCProvider = ({ children }) => {
       alert('Đối phương đã chuyển sang người khác.');
     });
 
+    // In-call live Gift Animation
     socket.on('call_gift_effect', (data) => {
       triggerGiftVisual(data);
     });
 
+    // In-call live Chat
     socket.on('in_call_message', (msg) => {
       setInCallMessages(prev => [...prev, msg]);
     });
@@ -804,13 +751,7 @@ export const WebRTCProvider = ({ children }) => {
     clearInterval(durationTimerRef.current);
     clearInterval(billingTimerRef.current);
 
-    if (hostVideoElementRef.current) {
-      try {
-        hostVideoElementRef.current.pause();
-        hostVideoElementRef.current.src = '';
-      } catch (e) {}
-      hostVideoElementRef.current = null;
-    }
+    setHostLiveVideoUrl(null);
 
     if (simulatedIntervalsRef.current.length > 0) {
       simulatedIntervalsRef.current.forEach(id => clearInterval(id));
@@ -936,6 +877,7 @@ export const WebRTCProvider = ({ children }) => {
       beautyFilter,
       localStream,
       remoteStream,
+      hostLiveVideoUrl,
       isSearchingQueue,
       queueMessage,
       giftAnimations,
