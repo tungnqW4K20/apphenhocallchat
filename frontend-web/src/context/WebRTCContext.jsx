@@ -20,6 +20,20 @@ const ICE_SERVERS = {
   iceCandidatePoolSize: 10
 };
 
+// High-Definition Realistic 9:16 Video Streams for AI Idol Hosts / Seed Demo Profiles
+const HOST_LIVE_VIDEOS = {
+  male: [
+    'https://assets.mixkit.co/videos/preview/mixkit-young-man-in-an-online-video-call-with-a-laptop-42999-large.mp4',
+    'https://assets.mixkit.co/videos/preview/mixkit-man-talking-on-video-call-with-smartphone-43000-large.mp4'
+  ],
+  female: [
+    'https://assets.mixkit.co/videos/preview/mixkit-vertical-video-of-a-woman-talking-on-a-video-call-43003-large.mp4',
+    'https://assets.mixkit.co/videos/preview/mixkit-young-woman-talking-on-video-call-42998-large.mp4',
+    'https://assets.mixkit.co/videos/preview/mixkit-young-woman-waving-during-a-video-call-42997-large.mp4',
+    'https://assets.mixkit.co/videos/preview/mixkit-woman-talking-on-a-video-call-42996-large.mp4'
+  ]
+};
+
 export const WebRTCProvider = ({ children }) => {
   const { socket } = useSocket();
   const { currentUser, updateBalance } = useAuth();
@@ -64,6 +78,7 @@ export const WebRTCProvider = ({ children }) => {
   const callPartnerRef = useRef(null);
   const callTypeRef = useRef('video');
   const simulatedIntervalsRef = useRef([]);
+  const hostVideoElementRef = useRef(null);
 
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
@@ -132,7 +147,7 @@ export const WebRTCProvider = ({ children }) => {
     }
   };
 
-  // Helper: Create a high-quality simulated stream with BOTH Video and Web Audio tracks (Mobile 9:16 or Desktop 16:9)
+  // Helper: Create animated canvas stream fallback with audio track
   const createSimulatedMediaStream = (user, label = 'HD Camera Live') => {
     const isMobileOrPortrait = typeof window !== 'undefined' && (
       window.innerHeight > window.innerWidth || 
@@ -152,7 +167,6 @@ export const WebRTCProvider = ({ children }) => {
     const render = () => {
       step += 0.04;
       
-      // Gradient background
       const grad = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
       grad.addColorStop(0, '#100e1d');
       grad.addColorStop(0.5, '#19152b');
@@ -164,7 +178,6 @@ export const WebRTCProvider = ({ children }) => {
       const centerY = isMobileOrPortrait ? canvas.height / 2 - 60 : canvas.height / 2 - 30;
       const baseRadius = isMobileOrPortrait ? 160 : 130;
 
-      // Dynamic glow ring
       const glowGrad = ctx.createRadialGradient(
         centerX, centerY, 80,
         centerX, centerY, baseRadius * 1.8
@@ -177,7 +190,6 @@ export const WebRTCProvider = ({ children }) => {
       ctx.arc(centerX, centerY, baseRadius * 1.8, 0, Math.PI * 2);
       ctx.fill();
 
-      // Avatar with smooth breathing zoom
       const zoom = 1 + Math.sin(step) * 0.025;
       const radius = baseRadius * zoom;
 
@@ -187,13 +199,7 @@ export const WebRTCProvider = ({ children }) => {
       ctx.clip();
       try {
         if (avatarImg.complete && avatarImg.naturalWidth > 0) {
-          ctx.drawImage(
-            avatarImg,
-            centerX - radius,
-            centerY - radius,
-            radius * 2,
-            radius * 2
-          );
+          ctx.drawImage(avatarImg, centerX - radius, centerY - radius, radius * 2, radius * 2);
         } else {
           ctx.fillStyle = '#FD297B';
           ctx.fillRect(centerX - radius, centerY - radius, radius * 2, radius * 2);
@@ -204,47 +210,18 @@ export const WebRTCProvider = ({ children }) => {
       }
       ctx.restore();
 
-      // Glowing border around avatar
       ctx.strokeStyle = '#FD297B';
       ctx.lineWidth = 6;
       ctx.beginPath();
       ctx.arc(centerX, centerY, radius + 2, 0, Math.PI * 2);
       ctx.stroke();
 
-      // Soundwave bars below avatar
       const waveY = centerY + radius + (isMobileOrPortrait ? 50 : 35);
       for (let i = -6; i <= 6; i++) {
         const barHeight = Math.abs(Math.sin(step * 2 + i * 0.5)) * 32 + 8;
         ctx.fillStyle = i % 2 === 0 ? '#FD297B' : '#A855F7';
         ctx.fillRect(centerX + i * 16 - 3, waveY - barHeight / 2, 7, barHeight);
       }
-
-      // Name & Status Badge
-      const badgeW = isMobileOrPortrait ? 320 : 280;
-      const badgeH = isMobileOrPortrait ? 50 : 44;
-      const badgeX = centerX - badgeW / 2;
-      const badgeY = canvas.height - (isMobileOrPortrait ? 180 : 90);
-
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
-      if (ctx.roundRect) {
-        ctx.beginPath();
-        ctx.roundRect(badgeX, badgeY, badgeW, badgeH, badgeH / 2);
-        ctx.fill();
-      } else {
-        ctx.fillRect(badgeX, badgeY, badgeW, badgeH);
-      }
-
-      // Live green dot
-      ctx.fillStyle = '#10B981';
-      ctx.beginPath();
-      ctx.arc(badgeX + 26, badgeY + badgeH / 2, 6, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Text
-      ctx.fillStyle = '#FFFFFF';
-      ctx.font = isMobileOrPortrait ? 'bold 18px sans-serif' : 'bold 16px sans-serif';
-      const nameText = user?.full_name || label;
-      ctx.fillText(nameText, badgeX + 44, badgeY + badgeH / 2 + 6);
     };
 
     render();
@@ -253,7 +230,6 @@ export const WebRTCProvider = ({ children }) => {
 
     const stream = canvas.captureStream(30);
 
-    // Add silent Web Audio track so SDP has both audio & video
     try {
       const AudioCtx = window.AudioContext || window.webkitAudioContext;
       if (AudioCtx) {
@@ -275,16 +251,66 @@ export const WebRTCProvider = ({ children }) => {
     return stream;
   };
 
-  // Helper: Create animated Live HD Stream for AI Idol Host
+  // Helper: Create Realistic High-Definition Video Stream for AI Idol Hosts
   const createHostLiveStream = (hostUser) => {
-    const stream = createSimulatedMediaStream(hostUser, 'IDOL LIVE 1080P HD');
-    remoteStreamRef.current = stream;
-    setRemoteStream(stream);
-    if (remoteVideoRef.current) {
-      remoteVideoRef.current.srcObject = stream;
-      remoteVideoRef.current.play().catch(() => {});
+    const isFemale = hostUser?.gender === 'female';
+    const videoList = isFemale ? HOST_LIVE_VIDEOS.female : HOST_LIVE_VIDEOS.male;
+    const videoUrl = videoList[Math.abs(Number(hostUser?.id || 1)) % videoList.length];
+
+    if (hostVideoElementRef.current) {
+      try {
+        hostVideoElementRef.current.pause();
+        hostVideoElementRef.current.src = '';
+      } catch (e) {}
     }
-    return stream;
+
+    const hostVideo = document.createElement('video');
+    hostVideo.src = videoUrl;
+    hostVideo.crossOrigin = 'anonymous';
+    hostVideo.loop = true;
+    hostVideo.muted = true;
+    hostVideo.playsInline = true;
+    hostVideo.autoplay = true;
+    hostVideoElementRef.current = hostVideo;
+
+    const attachStreamFromVideo = () => {
+      let stream = null;
+      if (hostVideo.captureStream) {
+        stream = hostVideo.captureStream(30);
+      } else if (hostVideo.mozCaptureStream) {
+        stream = hostVideo.mozCaptureStream(30);
+      }
+
+      if (stream && stream.getVideoTracks().length > 0) {
+        remoteStreamRef.current = stream;
+        setRemoteStream(stream);
+        if (remoteVideoRef.current) {
+          remoteVideoRef.current.srcObject = stream;
+          remoteVideoRef.current.play().catch(() => {});
+        }
+      } else {
+        const canvasStream = createSimulatedMediaStream(hostUser, 'IDOL LIVE 1080P HD');
+        remoteStreamRef.current = canvasStream;
+        setRemoteStream(canvasStream);
+        if (remoteVideoRef.current) {
+          remoteVideoRef.current.srcObject = canvasStream;
+          remoteVideoRef.current.play().catch(() => {});
+        }
+      }
+    };
+
+    hostVideo.play().then(() => {
+      attachStreamFromVideo();
+    }).catch((err) => {
+      console.warn('Host video play error, using fallback animated stream:', err);
+      const canvasStream = createSimulatedMediaStream(hostUser, 'IDOL LIVE 1080P HD');
+      remoteStreamRef.current = canvasStream;
+      setRemoteStream(canvasStream);
+      if (remoteVideoRef.current) {
+        remoteVideoRef.current.srcObject = canvasStream;
+        remoteVideoRef.current.play().catch(() => {});
+      }
+    });
   };
 
   const initializeMedia = async (isVideo = true) => {
@@ -301,7 +327,6 @@ export const WebRTCProvider = ({ children }) => {
       );
 
       if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        // Adjust camera constraints dynamically: 9:16 for Mobile/Portrait or 16:9 for Desktop
         const videoConstraints = isVideo ? {
           width: isMobileOrPortrait ? { ideal: 720, min: 480 } : { ideal: 1280, min: 640 },
           height: isMobileOrPortrait ? { ideal: 1280, min: 640 } : { ideal: 720, min: 480 },
@@ -331,21 +356,17 @@ export const WebRTCProvider = ({ children }) => {
         throw new Error('navigator.mediaDevices.getUserMedia is not supported on this origin');
       }
     } catch (err) {
-      console.warn('Physical camera/mic not accessible or blocked, generating high-res simulated feed:', err);
+      console.warn('Physical camera/mic fallback triggered:', err);
 
-      // Attempt to acquire audio only if video failed due to device busy
       let audioStream = null;
       try {
         if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
           audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
         }
-      } catch (e) {
-        // audio also busy or denied
-      }
+      } catch (e) {}
 
       const mockStream = createSimulatedMediaStream(currentUser, 'HD Camera Live');
       if (audioStream && audioStream.getAudioTracks().length > 0) {
-        // Replace synthetic audio with real mic
         const realAudioTrack = audioStream.getAudioTracks()[0];
         mockStream.getAudioTracks().forEach(t => mockStream.removeTrack(t));
         mockStream.addTrack(realAudioTrack);
@@ -414,14 +435,6 @@ export const WebRTCProvider = ({ children }) => {
       }
     };
 
-    pc.oniceconnectionstatechange = () => {
-      console.log('⚡ ICE Connection State:', pc.iceConnectionState);
-    };
-
-    pc.onconnectionstatechange = () => {
-      console.log('⚡ Peer Connection State:', pc.connectionState);
-    };
-
     setCallDuration(0);
     clearInterval(durationTimerRef.current);
     clearInterval(billingTimerRef.current);
@@ -478,7 +491,7 @@ export const WebRTCProvider = ({ children }) => {
           console.warn('Set remote desc error:', e);
         }
       } else if (!data.answer) {
-        // AI Idol Host mode (seed accounts) -> generate high-res live broadcast stream
+        // AI Idol Host mode (seed accounts) -> generate high-res live video stream
         const partnerToUse = callPartnerRef.current || callPartner;
         if (partnerToUse) {
           createHostLiveStream(partnerToUse);
@@ -604,12 +617,10 @@ export const WebRTCProvider = ({ children }) => {
       alert('Đối phương đã chuyển sang người khác.');
     });
 
-    // In-call live Gift Animation
     socket.on('call_gift_effect', (data) => {
       triggerGiftVisual(data);
     });
 
-    // In-call live Chat
     socket.on('in_call_message', (msg) => {
       setInCallMessages(prev => [...prev, msg]);
     });
@@ -793,7 +804,14 @@ export const WebRTCProvider = ({ children }) => {
     clearInterval(durationTimerRef.current);
     clearInterval(billingTimerRef.current);
 
-    // Clear all simulated intervals
+    if (hostVideoElementRef.current) {
+      try {
+        hostVideoElementRef.current.pause();
+        hostVideoElementRef.current.src = '';
+      } catch (e) {}
+      hostVideoElementRef.current = null;
+    }
+
     if (simulatedIntervalsRef.current.length > 0) {
       simulatedIntervalsRef.current.forEach(id => clearInterval(id));
       simulatedIntervalsRef.current = [];
