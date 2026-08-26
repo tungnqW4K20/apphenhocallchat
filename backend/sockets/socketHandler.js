@@ -417,8 +417,8 @@ function setupSockets(io) {
     });
 
     // ================= DISCONNECT =================
-    socket.on('disconnect', async () => {
-      console.log(`❌ Socket disconnected: ${socket.id}`);
+    socket.on('disconnect', async (reason) => {
+      console.log(`🔌 Socket disconnected: ${socket.id} (Lý do: ${reason})`);
       const uId = socketUsers.get(socket.id);
       socketUsers.delete(socket.id);
 
