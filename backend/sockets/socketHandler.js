@@ -132,7 +132,7 @@ function setupSockets(io) {
             });
           });
           socket.emit('call_ringing', { receiver: { id: receiver.id, full_name: receiver.full_name, avatar: receiver.avatar } });
-        } else if (receiver.is_host && receiver.id <= 22) {
+        } else if (receiver.is_host || receiver.id <= 25) {
           // AI Idol Seed Host fallback (only for built-in seed accounts without 2nd tab)
           const hasFree2MinVoucher = await dataService.consumeFreeCallVoucher(callerId);
           const receiverWatermark = securityService.generateCallWatermark(receiver.id, receiver.full_name, receiver.role);
@@ -212,11 +212,7 @@ function setupSockets(io) {
 
     socket.on('ice_candidate', (data) => {
       const { targetSocketId, candidate } = data;
-      if (targetSocketId) {
-        io.to(targetSocketId).emit('ice_candidate', {
-          candidate,
-          fromSocketId: socket.id
-        });
+      if (targetSocketId && candidate) {
         io.to(targetSocketId).emit('webrtc_ice_candidate', {
           candidate,
           fromSocketId: socket.id
@@ -226,7 +222,7 @@ function setupSockets(io) {
 
     socket.on('webrtc_offer', (data) => {
       const { targetSocketId, offer } = data;
-      if (targetSocketId) {
+      if (targetSocketId && offer) {
         io.to(targetSocketId).emit('webrtc_offer', {
           offer,
           fromSocketId: socket.id
@@ -236,7 +232,7 @@ function setupSockets(io) {
 
     socket.on('webrtc_answer', (data) => {
       const { targetSocketId, answer } = data;
-      if (targetSocketId) {
+      if (targetSocketId && answer) {
         io.to(targetSocketId).emit('webrtc_answer', {
           answer,
           fromSocketId: socket.id
@@ -246,7 +242,7 @@ function setupSockets(io) {
 
     socket.on('webrtc_ice_candidate', (data) => {
       const { targetSocketId, candidate } = data;
-      if (targetSocketId) {
+      if (targetSocketId && candidate) {
         io.to(targetSocketId).emit('webrtc_ice_candidate', {
           candidate,
           fromSocketId: socket.id
