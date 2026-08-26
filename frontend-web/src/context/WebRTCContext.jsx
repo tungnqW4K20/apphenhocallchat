@@ -20,20 +20,6 @@ const ICE_SERVERS = {
   iceCandidatePoolSize: 10
 };
 
-// High-Definition Realistic 9:16 Video Streams for AI Idol Hosts / Seed Demo Profiles
-const HOST_LIVE_VIDEOS = {
-  male: [
-    'https://assets.mixkit.co/videos/preview/mixkit-young-man-in-an-online-video-call-with-a-laptop-42999-large.mp4',
-    'https://assets.mixkit.co/videos/preview/mixkit-man-talking-on-video-call-with-smartphone-43000-large.mp4'
-  ],
-  female: [
-    'https://assets.mixkit.co/videos/preview/mixkit-vertical-video-of-a-woman-talking-on-a-video-call-43003-large.mp4',
-    'https://assets.mixkit.co/videos/preview/mixkit-young-woman-talking-on-video-call-42998-large.mp4',
-    'https://assets.mixkit.co/videos/preview/mixkit-young-woman-waving-during-a-video-call-42997-large.mp4',
-    'https://assets.mixkit.co/videos/preview/mixkit-woman-talking-on-a-video-call-42996-large.mp4'
-  ]
-};
-
 export const WebRTCProvider = ({ children }) => {
   const { socket } = useSocket();
   const { currentUser, updateBalance } = useAuth();
@@ -52,7 +38,6 @@ export const WebRTCProvider = ({ children }) => {
   // Streams state for reliable UI attachment
   const [localStream, setLocalStream] = useState(null);
   const [remoteStream, setRemoteStream] = useState(null);
-  const [hostLiveVideoUrl, setHostLiveVideoUrl] = useState(null);
 
   // Random Queue State
   const [isSearchingQueue, setIsSearchingQueue] = useState(false);
@@ -148,7 +133,7 @@ export const WebRTCProvider = ({ children }) => {
   };
 
   // Helper: Create animated canvas stream fallback with audio track
-  const createSimulatedMediaStream = (user, label = 'HD Camera Live') => {
+  const createSimulatedMediaStream = (user) => {
     const isMobileOrPortrait = typeof window !== 'undefined' && (
       window.innerHeight > window.innerWidth || 
       window.innerWidth <= 768 ||
@@ -178,18 +163,6 @@ export const WebRTCProvider = ({ children }) => {
       const centerY = isMobileOrPortrait ? canvas.height / 2 - 60 : canvas.height / 2 - 30;
       const baseRadius = isMobileOrPortrait ? 160 : 130;
 
-      const glowGrad = ctx.createRadialGradient(
-        centerX, centerY, 80,
-        centerX, centerY, baseRadius * 1.8
-      );
-      glowGrad.addColorStop(0, 'rgba(244, 63, 94, 0.25)');
-      glowGrad.addColorStop(0.7, 'rgba(168, 85, 247, 0.1)');
-      glowGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-      ctx.fillStyle = glowGrad;
-      ctx.beginPath();
-      ctx.arc(centerX, centerY, baseRadius * 1.8, 0, Math.PI * 2);
-      ctx.fill();
-
       const zoom = 1 + Math.sin(step) * 0.025;
       const radius = baseRadius * zoom;
 
@@ -215,13 +188,6 @@ export const WebRTCProvider = ({ children }) => {
       ctx.beginPath();
       ctx.arc(centerX, centerY, radius + 2, 0, Math.PI * 2);
       ctx.stroke();
-
-      const waveY = centerY + radius + (isMobileOrPortrait ? 50 : 35);
-      for (let i = -6; i <= 6; i++) {
-        const barHeight = Math.abs(Math.sin(step * 2 + i * 0.5)) * 32 + 8;
-        ctx.fillStyle = i % 2 === 0 ? '#FD297B' : '#A855F7';
-        ctx.fillRect(centerX + i * 16 - 3, waveY - barHeight / 2, 7, barHeight);
-      }
     };
 
     render();
@@ -249,13 +215,6 @@ export const WebRTCProvider = ({ children }) => {
     }
 
     return stream;
-  };
-
-  const setHostDirectVideo = (hostUser) => {
-    const isFemale = hostUser?.gender === 'female';
-    const videoList = isFemale ? HOST_LIVE_VIDEOS.female : HOST_LIVE_VIDEOS.male;
-    const videoUrl = videoList[Math.abs(Number(hostUser?.id || 1)) % videoList.length];
-    setHostLiveVideoUrl(videoUrl);
   };
 
   const initializeMedia = async (isVideo = true) => {
@@ -310,7 +269,7 @@ export const WebRTCProvider = ({ children }) => {
         }
       } catch (e) {}
 
-      const mockStream = createSimulatedMediaStream(currentUser, 'HD Camera Live');
+      const mockStream = createSimulatedMediaStream(currentUser);
       if (audioStream && audioStream.getAudioTracks().length > 0) {
         const realAudioTrack = audioStream.getAudioTracks()[0];
         mockStream.getAudioTracks().forEach(t => mockStream.removeTrack(t));
@@ -434,12 +393,6 @@ export const WebRTCProvider = ({ children }) => {
           await flushIncomingIceCandidates();
         } catch (e) {
           console.warn('Set remote desc error:', e);
-        }
-      } else if (!data.answer) {
-        // AI Idol Host mode (seed accounts) -> generate high-res live video stream
-        const partnerToUse = callPartnerRef.current || callPartner;
-        if (partnerToUse) {
-          setHostDirectVideo(partnerToUse);
         }
       }
     });
@@ -751,8 +704,6 @@ export const WebRTCProvider = ({ children }) => {
     clearInterval(durationTimerRef.current);
     clearInterval(billingTimerRef.current);
 
-    setHostLiveVideoUrl(null);
-
     if (simulatedIntervalsRef.current.length > 0) {
       simulatedIntervalsRef.current.forEach(id => clearInterval(id));
       simulatedIntervalsRef.current = [];
@@ -877,7 +828,6 @@ export const WebRTCProvider = ({ children }) => {
       beautyFilter,
       localStream,
       remoteStream,
-      hostLiveVideoUrl,
       isSearchingQueue,
       queueMessage,
       giftAnimations,
