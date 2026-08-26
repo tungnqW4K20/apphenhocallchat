@@ -19,7 +19,7 @@ import {
   X,
   Volume2,
   VolumeX,
-  UserCheck
+  Radio
 } from 'lucide-react';
 import { GiftDrawer } from './GiftDrawer';
 
@@ -56,7 +56,6 @@ export const VideoCallModal = ({ onOpenReport }) => {
   const [isBlurredByPrivacy, setIsBlurredByPrivacy] = useState(false);
   const [isRemoteVideoPlaying, setIsRemoteVideoPlaying] = useState(false);
   const [isAudioMutedByPolicy, setIsAudioMutedByPolicy] = useState(false);
-  const [showConnectingNotice, setShowConnectingNotice] = useState(true);
 
   const chatEndRef = useRef(null);
 
@@ -92,17 +91,9 @@ export const VideoCallModal = ({ onOpenReport }) => {
   }, []);
 
   useEffect(() => {
-    setShowConnectingNotice(true);
-    const timer = setTimeout(() => {
-      setShowConnectingNotice(false);
-    }, 2000);
-    return () => clearTimeout(timer);
-  }, [isInCall, callPartner]);
-
-  useEffect(() => {
     setIsRemoteVideoPlaying(false);
     setIsAudioMutedByPolicy(false);
-  }, [isInCall, callPartner]);
+  }, [isInCall, callPartner?.id]);
 
   useEffect(() => {
     if (isChatOpen) {
@@ -172,16 +163,15 @@ export const VideoCallModal = ({ onOpenReport }) => {
 
   const quickReactions = ['❤️', '😍', '🔥', '👏', '💋', '✨', '🌹'];
   const partnerAvatar = callPartner.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800';
-  const hasActiveRemoteVideo = isRemoteVideoPlaying || !!remoteStream;
 
   return (
     <div 
       onContextMenu={(e) => e.preventDefault()}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-2xl animate-fade-in overflow-hidden select-none"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[#0d0c15] backdrop-blur-2xl animate-fade-in overflow-hidden select-none"
     >
       {/* Ambient Blurred Background for Desktop */}
       <div 
-        className="absolute inset-0 filter blur-3xl scale-125 opacity-25 pointer-events-none hidden md:block bg-cover bg-center"
+        className="absolute inset-0 filter blur-3xl scale-125 opacity-20 pointer-events-none hidden md:block bg-cover bg-center"
         style={{ backgroundImage: `url(${partnerAvatar})` }}
       />
 
@@ -222,7 +212,7 @@ export const VideoCallModal = ({ onOpenReport }) => {
         </div>
 
         {/* Desktop Brand Tag */}
-        <div className="hidden md:flex items-center gap-2 px-4 py-1.5 rounded-full bg-black/60 border border-white/10 backdrop-blur-md">
+        <div className="hidden md:flex items-center gap-2 px-4 py-1.5 rounded-full bg-black/70 border border-white/15 backdrop-blur-md shadow-lg">
           <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping" />
           <span className="text-xs font-black text-white tracking-wider uppercase">Cuộc Gọi Video 1v1 Song Song</span>
         </div>
@@ -259,9 +249,43 @@ export const VideoCallModal = ({ onOpenReport }) => {
       <div className="relative w-full h-full flex flex-col md:flex-row items-center justify-center md:gap-6 p-0 md:p-6 overflow-hidden">
         
         {/* FRAME 1: ĐỐI PHƯƠNG (Partner Camera / Live Broadcast) */}
-        <div className="relative w-full h-full md:w-[420px] lg:w-[460px] md:h-[82vh] md:max-h-[800px] md:aspect-[9/16] md:rounded-[36px] md:border-2 md:border-white/20 md:shadow-[0_20px_60px_rgba(0,0,0,0.8)] overflow-hidden bg-black flex items-center justify-center">
+        <div className="relative w-full h-full md:w-[420px] lg:w-[460px] md:h-[82vh] md:max-h-[800px] md:aspect-[9/16] md:rounded-[36px] md:border-2 md:border-white/20 md:shadow-[0_20px_60px_rgba(0,0,0,0.8)] overflow-hidden bg-[#12111d] flex items-center justify-center">
           
-          {/* Partner WebRTC Video Track */}
+          {/* Always-Visible Animated Live Broadcast Avatar (Layered Underneath) */}
+          <div className="absolute inset-0 flex flex-col items-center justify-center overflow-hidden z-10 bg-gradient-to-b from-[#1a1829] via-[#12111e] to-[#0c0a14]">
+            {/* Blurred ambient portrait */}
+            <div 
+              className="absolute inset-0 scale-125 filter blur-3xl opacity-50 bg-cover bg-center"
+              style={{ backgroundImage: `url(${partnerAvatar})` }}
+            />
+
+            {/* Glowing Live Broadcast Center */}
+            <div className="relative z-20 flex flex-col items-center justify-center space-y-4">
+              <div className="relative">
+                {/* Dynamic Ripple Rings */}
+                <div className="absolute -inset-4 rounded-full bg-rose-500/20 animate-ping" />
+                <div className="absolute -inset-8 rounded-full bg-purple-500/10 animate-pulse" />
+                
+                <img
+                  src={partnerAvatar}
+                  alt={callPartner.full_name}
+                  className="relative w-28 h-28 sm:w-36 sm:h-36 rounded-full object-cover ring-4 ring-rose-500 shadow-[0_0_40px_rgba(244,63,94,0.6)]"
+                />
+                <span className="absolute bottom-1 right-2 w-5 h-5 rounded-full bg-emerald-500 ring-4 ring-black" />
+              </div>
+
+              <div className="text-center space-y-1">
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-500/20 border border-rose-500/40 text-rose-300 text-xs font-bold shadow-lg">
+                  <Radio className="w-3.5 h-3.5 animate-pulse text-rose-400" />
+                  <span>9:16 HD LIVE BROADCAST</span>
+                </div>
+                <h3 className="text-base sm:text-lg font-black text-white">{callPartner.full_name}</h3>
+                <p className="text-xs text-gray-400 font-medium">{callPartner.city || 'Việt Nam'} • {callPartner.job || 'Thành viên'}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Partner WebRTC Video Track (Overlaid on top, transparent until video frames play) */}
           <video
             ref={remoteVideoRef}
             autoPlay
@@ -270,30 +294,9 @@ export const VideoCallModal = ({ onOpenReport }) => {
             onCanPlay={() => setIsRemoteVideoPlaying(true)}
             onPlaying={() => setIsRemoteVideoPlaying(true)}
             className={`absolute inset-0 w-full h-full object-cover z-20 transition-opacity duration-500 ${
-              hasActiveRemoteVideo ? 'opacity-100' : 'opacity-0 pointer-events-none'
+              isRemoteVideoPlaying ? 'opacity-100' : 'opacity-0'
             } ${beautyFilter ? 'brightness-105 contrast-105 saturate-110' : ''}`}
           />
-
-          {/* Partner Fallback (Photo & Connecting Animation) */}
-          <div className={`absolute inset-0 flex items-center justify-center overflow-hidden z-10 transition-opacity duration-500 ${hasActiveRemoteVideo ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
-            <div 
-              className="absolute inset-0 scale-125 filter blur-3xl opacity-60 bg-cover bg-center"
-              style={{ backgroundImage: `url(${partnerAvatar})` }}
-            />
-
-            <img
-              src={partnerAvatar}
-              alt={callPartner.full_name}
-              className="w-full h-full object-cover transition-all duration-500"
-            />
-
-            {showConnectingNotice && (
-              <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center p-6 text-center space-y-3 z-10 transition-opacity duration-500 animate-fade-in">
-                <div className="w-12 h-12 rounded-full border-4 border-rose-500 border-t-transparent animate-spin" />
-                <p className="text-sm font-bold text-white shadow">Đang đồng bộ luồng Camera 9:16 HD với {callPartner.full_name}...</p>
-              </div>
-            )}
-          </div>
 
           {/* Desktop Partner Info Badge (Top Left of Frame 1) */}
           <div className="hidden md:flex absolute top-4 left-4 z-30 items-center gap-2.5 px-3 py-1.5 rounded-full bg-black/70 backdrop-blur-md border border-white/15 shadow-lg">

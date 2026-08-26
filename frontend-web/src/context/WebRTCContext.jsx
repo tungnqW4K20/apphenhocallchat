@@ -146,7 +146,6 @@ export const WebRTCProvider = ({ children }) => {
     const ctx = canvas.getContext('2d');
 
     const avatarImg = new Image();
-    avatarImg.crossOrigin = 'anonymous';
     avatarImg.src = user?.avatar || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=500';
 
     let step = 0;
@@ -435,9 +434,10 @@ export const WebRTCProvider = ({ children }) => {
       // Every 60 seconds (1 minute of active call) -> Deduct coin
       if (seconds > 0 && seconds % 60 === 0) {
         const minuteNum = Math.floor(seconds / 60);
-        if (callPartnerRef.current) {
+        const activePartner = callPartnerRef.current;
+        if (activePartner) {
           api.deductCallMinute({
-            receiver_id: callPartnerRef.current.id,
+            receiver_id: activePartner.id,
             call_type: callTypeRef.current || 'video'
           }).then(res => {
             if (res.success) {
@@ -479,8 +479,9 @@ export const WebRTCProvider = ({ children }) => {
         }
       } else if (!data.answer) {
         // AI Idol Host mode (seed accounts) -> generate high-res live broadcast stream
-        if (callPartnerRef.current) {
-          createHostLiveStream(callPartnerRef.current);
+        const partnerToUse = callPartnerRef.current || callPartner;
+        if (partnerToUse) {
+          createHostLiveStream(partnerToUse);
         }
       }
     });
@@ -570,6 +571,7 @@ export const WebRTCProvider = ({ children }) => {
       setIsSearchingQueue(false);
       partnerSocketIdRef.current = data.partnerSocketId;
       callSessionIdRef.current = data.sessionId;
+      callPartnerRef.current = data.partner;
       setCallPartner(data.partner);
       setCallType('video');
       setIsInCall(true);
@@ -691,6 +693,7 @@ export const WebRTCProvider = ({ children }) => {
       return;
     }
 
+    callPartnerRef.current = targetPartner;
     setCallPartner(targetPartner);
     setCallType(type);
     setIsInCall(true);
@@ -718,6 +721,7 @@ export const WebRTCProvider = ({ children }) => {
 
   const answerIncomingCall = async (callData) => {
     if (!socket) return;
+    callPartnerRef.current = callData.caller;
     setCallPartner(callData.caller);
     setCallType(callData.callType || 'video');
     partnerSocketIdRef.current = callData.callerSocketId;
