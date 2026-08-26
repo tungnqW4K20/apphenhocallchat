@@ -19,13 +19,14 @@ import {
   X,
   Volume2,
   VolumeX,
-  Radio
+  PhoneCall
 } from 'lucide-react';
 import { GiftDrawer } from './GiftDrawer';
 
 export const VideoCallModal = ({ onOpenReport }) => {
   const { 
     isInCall, 
+    isRinging,
     callPartner, 
     callType, 
     callDuration, 
@@ -55,7 +56,6 @@ export const VideoCallModal = ({ onOpenReport }) => {
   const [chatInput, setChatInput] = useState('');
   const [isBlurredByPrivacy, setIsBlurredByPrivacy] = useState(false);
   const [isAudioMutedByPolicy, setIsAudioMutedByPolicy] = useState(false);
-  const [isRemoteVideoActive, setIsRemoteVideoActive] = useState(false);
 
   const chatEndRef = useRef(null);
 
@@ -92,7 +92,6 @@ export const VideoCallModal = ({ onOpenReport }) => {
 
   useEffect(() => {
     setIsAudioMutedByPolicy(false);
-    setIsRemoteVideoActive(false);
   }, [isInCall, callPartner?.id]);
 
   useEffect(() => {
@@ -112,15 +111,13 @@ export const VideoCallModal = ({ onOpenReport }) => {
         playPromise
           .then(() => {
             setIsAudioMutedByPolicy(false);
-            setIsRemoteVideoActive(true);
           })
           .catch((err) => {
-            console.warn('Autoplay unmuted blocked, falling back to muted autoplay:', err);
+            console.warn('Autoplay unmuted blocked by browser policy:', err);
             if (remoteVideoRef.current) {
               remoteVideoRef.current.muted = true;
               remoteVideoRef.current.play().then(() => {
                 setIsAudioMutedByPolicy(true);
-                setIsRemoteVideoActive(true);
               }).catch(() => {});
             }
           });
@@ -206,7 +203,7 @@ export const VideoCallModal = ({ onOpenReport }) => {
             <p className="text-[10px] text-gray-300 font-medium drop-shadow flex items-center gap-1">
               <span>{callPartner.city || 'Việt Nam'}</span>
               <span>•</span>
-              <span className="text-emerald-400 font-semibold">9:16 HD Live</span>
+              <span className="text-emerald-400 font-semibold">{isRinging ? 'Đang gọi...' : 'Đã kết nối'}</span>
             </p>
           </div>
         </div>
@@ -214,7 +211,7 @@ export const VideoCallModal = ({ onOpenReport }) => {
         {/* Desktop Brand Tag */}
         <div className="hidden md:flex items-center gap-2 px-4 py-1.5 rounded-full bg-black/70 border border-white/15 backdrop-blur-md shadow-lg">
           <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping" />
-          <span className="text-xs font-black text-white tracking-wider uppercase">Cuộc Gọi Video 1v1 Song Song</span>
+          <span className="text-xs font-black text-white tracking-wider uppercase">Cuộc Gọi Video Trực Tiếp 1v1</span>
         </div>
 
         {/* Duration Timer & Coin meter */}
@@ -222,7 +219,7 @@ export const VideoCallModal = ({ onOpenReport }) => {
           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/70 border border-white/15 backdrop-blur-md shadow-lg">
             <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
             <span className="font-mono font-bold text-xs text-white">
-              {formatDuration(callDuration)}
+              {isRinging ? 'Đang đổ chuông...' : formatDuration(callDuration)}
             </span>
           </div>
 
@@ -248,33 +245,48 @@ export const VideoCallModal = ({ onOpenReport }) => {
       */}
       <div className="relative w-full h-full flex flex-col md:flex-row items-center justify-center md:gap-6 p-0 md:p-6 overflow-hidden">
         
-        {/* FRAME 1: ĐỐI PHƯƠNG (Partner HD Portrait Presentation + WebRTC Live Camera) */}
+        {/* FRAME 1: ĐỐI PHƯƠNG (Partner Live Camera Stream / Ringing Screen) */}
         <div className="relative w-full h-full md:w-[420px] lg:w-[460px] md:h-[82vh] md:max-h-[800px] md:aspect-[9/16] md:rounded-[36px] md:border-2 md:border-white/20 md:shadow-[0_20px_60px_rgba(0,0,0,0.8)] overflow-hidden bg-black flex items-center justify-center">
           
-          {/* A. Fullscreen High-Resolution Portrait Visual of Partner (Never Black!) */}
-          <div className="absolute inset-0 z-10 flex items-center justify-center overflow-hidden">
-            <img
-              src={partnerAvatar}
-              alt={callPartner.full_name}
-              className={`w-full h-full object-cover filter brightness-95 transform scale-105 transition-transform duration-1000 ${
-                beautyFilter ? 'saturate-110 contrast-105' : ''
-              }`}
-            />
-            {/* Ambient Lighting Gradient */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/50 pointer-events-none" />
-          </div>
-
-          {/* B. Real WebRTC Remote Video Track (Fades in immediately when peer camera streams) */}
+          {/* 1. Real Live Video Feed from Remote WebRTC Peer */}
           <video
             ref={remoteVideoRef}
             autoPlay
             playsInline
-            onPlaying={() => setIsRemoteVideoActive(true)}
-            onCanPlay={() => setIsRemoteVideoActive(true)}
-            className={`absolute inset-0 w-full h-full object-cover z-20 transition-opacity duration-300 ${
-              isRemoteVideoActive && remoteStream ? 'opacity-100' : 'opacity-0 pointer-events-none'
+            className={`absolute inset-0 w-full h-full object-cover z-20 ${
+              remoteStream ? 'block' : 'hidden'
             } ${beautyFilter ? 'brightness-105 contrast-105 saturate-110' : ''}`}
           />
+
+          {/* 2. Ringing / Waiting State (Shown when waiting for the other user to answer or connect) */}
+          {!remoteStream && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center overflow-hidden z-10 bg-gradient-to-b from-[#1a1829] via-[#12111e] to-[#0c0a14]">
+              <div 
+                className="absolute inset-0 scale-125 filter blur-3xl opacity-50 bg-cover bg-center"
+                style={{ backgroundImage: `url(${partnerAvatar})` }}
+              />
+              <div className="relative z-20 flex flex-col items-center justify-center space-y-4">
+                <div className="relative">
+                  <div className="absolute -inset-4 rounded-full bg-rose-500/30 animate-ping" />
+                  <div className="absolute -inset-8 rounded-full bg-pink-500/20 animate-pulse" />
+                  <img
+                    src={partnerAvatar}
+                    alt={callPartner.full_name}
+                    className="relative w-28 h-28 sm:w-36 sm:h-36 rounded-full object-cover ring-4 ring-rose-500 shadow-2xl"
+                  />
+                  <span className="absolute bottom-1 right-2 w-5 h-5 rounded-full bg-emerald-500 ring-4 ring-black" />
+                </div>
+                <div className="text-center space-y-1">
+                  <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-rose-500/20 border border-rose-500/40 text-rose-300 text-xs font-bold shadow-lg animate-pulse">
+                    <PhoneCall className="w-3.5 h-3.5 animate-bounce text-rose-400" />
+                    <span>{isRinging ? 'ĐANG ĐỔ CHUÔNG ĐỐI PHƯƠNG...' : 'ĐANG KẾT NỐI CAMERA TRỰC TIẾP...'}</span>
+                  </div>
+                  <h3 className="text-base sm:text-lg font-black text-white">{callPartner.full_name}</h3>
+                  <p className="text-xs text-gray-400 font-medium">{callPartner.city || 'Việt Nam'}</p>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Desktop Partner Info Badge (Top Left of Frame 1) */}
           <div className="hidden md:flex absolute top-4 left-4 z-30 items-center gap-2.5 px-3 py-1.5 rounded-full bg-black/70 backdrop-blur-md border border-white/15 shadow-lg">
@@ -288,14 +300,6 @@ export const VideoCallModal = ({ onOpenReport }) => {
             </div>
           </div>
 
-          {/* Live Status Badge in Center Bottom of Frame 1 */}
-          <div className="absolute bottom-24 md:bottom-6 inset-x-0 z-30 flex flex-col items-center justify-center pointer-events-none">
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-black/60 backdrop-blur-md border border-white/20 text-white text-xs font-bold shadow-xl">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-              <span>{isRemoteVideoActive && remoteStream ? 'CAMERA ĐANG TRUYỀN HD' : '9:16 HD LIVE CONNECTED'}</span>
-            </div>
-          </div>
-
           {/* Soundwave Visualizer on Bottom Left */}
           <div className="absolute bottom-24 md:bottom-5 left-4 z-30 flex items-end gap-1 pointer-events-none">
             <span className="w-1 h-3 bg-rose-500 rounded-full animate-bounce [animation-delay:0ms]" />
@@ -304,6 +308,9 @@ export const VideoCallModal = ({ onOpenReport }) => {
             <span className="w-1 h-6 bg-rose-400 rounded-full animate-bounce [animation-delay:75ms]" />
             <span className="w-1 h-4 bg-pink-500 rounded-full animate-bounce [animation-delay:200ms]" />
           </div>
+
+          {/* Live Gradient Vignette */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/60 pointer-events-none z-25" />
 
         </div>
 
@@ -339,7 +346,7 @@ export const VideoCallModal = ({ onOpenReport }) => {
                 className="w-12 h-12 md:w-24 md:h-24 rounded-full object-cover ring-2 ring-rose-500 mb-2 shadow-lg"
               />
               <span className="text-xs md:text-sm font-bold text-white leading-tight">{currentUser?.full_name || 'Bạn'}</span>
-              <span className="text-[9px] md:text-xs text-gray-400 mt-0.5">{isVideoDisabled ? 'Đã tắt camera' : 'HD Camera Live'}</span>
+              <span className="text-[9px] md:text-xs text-gray-400 mt-0.5">{isVideoDisabled ? 'Đã tắt camera' : 'Camera đang mở'}</span>
             </div>
           )}
 
@@ -351,7 +358,7 @@ export const VideoCallModal = ({ onOpenReport }) => {
                 <span className="text-xs font-black text-white truncate max-w-[120px]">{currentUser?.full_name || 'Bạn'} (Tôi)</span>
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
               </div>
-              <span className="text-[9px] text-emerald-300 font-semibold block">Camera Của Bạn • HD Live</span>
+              <span className="text-[9px] text-emerald-300 font-semibold block">Camera Của Bạn • Live HD</span>
             </div>
           </div>
 

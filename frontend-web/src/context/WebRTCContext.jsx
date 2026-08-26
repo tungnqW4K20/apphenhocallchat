@@ -25,6 +25,7 @@ export const WebRTCProvider = ({ children }) => {
   const { currentUser, updateBalance } = useAuth();
 
   const [isInCall, setIsInCall] = useState(false);
+  const [isRinging, setIsRinging] = useState(false);
   const [callPartner, setCallPartner] = useState(null);
   const [callType, setCallType] = useState('video'); // 'video' | 'voice'
   const [callDuration, setCallDuration] = useState(0);
@@ -63,7 +64,6 @@ export const WebRTCProvider = ({ children }) => {
   const billingTimerRef = useRef(null);
   const callPartnerRef = useRef(null);
   const callTypeRef = useRef('video');
-  const simulatedIntervalsRef = useRef([]);
 
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
@@ -132,91 +132,6 @@ export const WebRTCProvider = ({ children }) => {
     }
   };
 
-  // Helper: Create animated canvas stream fallback with audio track
-  const createSimulatedMediaStream = (user) => {
-    const isMobileOrPortrait = typeof window !== 'undefined' && (
-      window.innerHeight > window.innerWidth || 
-      window.innerWidth <= 768 ||
-      /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
-    );
-
-    const canvas = document.createElement('canvas');
-    canvas.width = isMobileOrPortrait ? 720 : 1280;
-    canvas.height = isMobileOrPortrait ? 1280 : 720;
-    const ctx = canvas.getContext('2d');
-
-    const avatarImg = new Image();
-    avatarImg.src = user?.avatar || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=500';
-
-    let step = 0;
-    const render = () => {
-      step += 0.04;
-      
-      const grad = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-      grad.addColorStop(0, '#100e1d');
-      grad.addColorStop(0.5, '#19152b');
-      grad.addColorStop(1, '#0c0a17');
-      ctx.fillStyle = grad;
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-      const centerX = canvas.width / 2;
-      const centerY = isMobileOrPortrait ? canvas.height / 2 - 60 : canvas.height / 2 - 30;
-      const baseRadius = isMobileOrPortrait ? 160 : 130;
-
-      const zoom = 1 + Math.sin(step) * 0.025;
-      const radius = baseRadius * zoom;
-
-      ctx.save();
-      ctx.beginPath();
-      ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
-      ctx.clip();
-      try {
-        if (avatarImg.complete && avatarImg.naturalWidth > 0) {
-          ctx.drawImage(avatarImg, centerX - radius, centerY - radius, radius * 2, radius * 2);
-        } else {
-          ctx.fillStyle = '#FD297B';
-          ctx.fillRect(centerX - radius, centerY - radius, radius * 2, radius * 2);
-        }
-      } catch (e) {
-        ctx.fillStyle = '#FD297B';
-        ctx.fillRect(centerX - radius, centerY - radius, radius * 2, radius * 2);
-      }
-      ctx.restore();
-
-      ctx.strokeStyle = '#FD297B';
-      ctx.lineWidth = 6;
-      ctx.beginPath();
-      ctx.arc(centerX, centerY, radius + 2, 0, Math.PI * 2);
-      ctx.stroke();
-    };
-
-    render();
-    const intervalId = setInterval(render, 1000 / 30);
-    simulatedIntervalsRef.current.push(intervalId);
-
-    const stream = canvas.captureStream(30);
-
-    try {
-      const AudioCtx = window.AudioContext || window.webkitAudioContext;
-      if (AudioCtx) {
-        const actx = new AudioCtx();
-        const dest = actx.createMediaStreamDestination();
-        const gain = actx.createGain();
-        gain.gain.value = 0;
-        const osc = actx.createOscillator();
-        osc.connect(gain);
-        gain.connect(dest);
-        osc.start();
-        const track = dest.stream.getAudioTracks()[0];
-        if (track) stream.addTrack(track);
-      }
-    } catch (e) {
-      console.warn('AudioContext destination warning:', e);
-    }
-
-    return stream;
-  };
-
   const initializeMedia = async (isVideo = true) => {
     try {
       if (localStreamRef.current && localStreamRef.current.active && localStreamRef.current.getTracks().length > 0) {
@@ -257,33 +172,20 @@ export const WebRTCProvider = ({ children }) => {
         }
         return stream;
       } else {
-        throw new Error('navigator.mediaDevices.getUserMedia is not supported on this origin');
+        throw new Error('getUserMedia not supported on this origin');
       }
     } catch (err) {
-      console.warn('Physical camera/mic fallback triggered:', err);
-
-      let audioStream = null;
+      console.warn('Physical camera/mic access warning:', err);
+      // Request audio-only if camera is blocked
       try {
         if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-          audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          localStreamRef.current = audioStream;
+          setLocalStream(audioStream);
+          return audioStream;
         }
       } catch (e) {}
-
-      const mockStream = createSimulatedMediaStream(currentUser);
-      if (audioStream && audioStream.getAudioTracks().length > 0) {
-        const realAudioTrack = audioStream.getAudioTracks()[0];
-        mockStream.getAudioTracks().forEach(t => mockStream.removeTrack(t));
-        mockStream.addTrack(realAudioTrack);
-      }
-
-      localStreamRef.current = mockStream;
-      setLocalStream(mockStream);
-
-      if (localVideoRef.current) {
-        localVideoRef.current.srcObject = mockStream;
-        localVideoRef.current.play().catch(() => {});
-      }
-      return mockStream;
+      return null;
     }
   };
 
@@ -319,18 +221,12 @@ export const WebRTCProvider = ({ children }) => {
     };
 
     pc.ontrack = (event) => {
-      console.log('🎥 Live Remote Media Track Received:', event.track.kind, event);
-      let stream = (event.streams && event.streams[0]) ? event.streams[0] : null;
-      if (!stream) {
-        if (!remoteStreamRef.current) {
-          remoteStreamRef.current = new MediaStream();
-        }
-        remoteStreamRef.current.addTrack(event.track);
-        stream = remoteStreamRef.current;
-      } else {
-        remoteStreamRef.current = stream;
-      }
+      console.log('🎥 Live Remote Media Track Received via WebRTC:', event.track.kind, event.streams);
+      const stream = (event.streams && event.streams[0]) ? event.streams[0] : new MediaStream([event.track]);
+      remoteStreamRef.current = stream;
       setRemoteStream(stream);
+      setIsRinging(false);
+
       if (remoteVideoRef.current) {
         remoteVideoRef.current.srcObject = stream;
         remoteVideoRef.current.play().catch((err) => {
@@ -339,51 +235,18 @@ export const WebRTCProvider = ({ children }) => {
       }
     };
 
-    setCallDuration(0);
-    clearInterval(durationTimerRef.current);
-    clearInterval(billingTimerRef.current);
-
-    let seconds = 0;
-    durationTimerRef.current = setInterval(() => {
-      seconds += 1;
-      setCallDuration(seconds);
-
-      // Every 60 seconds (1 minute of active call) -> Deduct coin
-      if (seconds > 0 && seconds % 60 === 0) {
-        const minuteNum = Math.floor(seconds / 60);
-        const activePartner = callPartnerRef.current;
-        if (activePartner) {
-          api.deductCallMinute({
-            receiver_id: activePartner.id,
-            call_type: callTypeRef.current || 'video'
-          }).then(res => {
-            if (res.success) {
-              updateBalance(res.remaining_coins, undefined);
-              setLatestCoinTick({
-                amount: res.rate || 20,
-                minute: minuteNum,
-                id: Date.now()
-              });
-              setTimeout(() => setLatestCoinTick(null), 4000);
-            }
-          }).catch(err => {
-            console.warn('Minute billing tick error:', err);
-            if (err.message && (err.message.includes('hết Xu') || err.message.includes('không đủ'))) {
-              alert('⚠️ Bạn đã hết Xu để duy trì cuộc gọi! Cuộc gọi kết thúc.');
-              endCurrentCall();
-            }
-          });
-        }
-      }
-    }, 1000);
-
     return pc;
   };
 
   useEffect(() => {
     if (!socket) return;
 
+    socket.on('call_ringing', () => {
+      setIsRinging(true);
+    });
+
     socket.on('call_accepted', async (data) => {
+      setIsRinging(false);
       partnerSocketIdRef.current = data.receiverSocketId;
       flushPendingIceCandidates(data.receiverSocketId);
 
@@ -395,6 +258,42 @@ export const WebRTCProvider = ({ children }) => {
           console.warn('Set remote desc error:', e);
         }
       }
+
+      // Start Call Timer
+      setCallDuration(0);
+      clearInterval(durationTimerRef.current);
+      let seconds = 0;
+      durationTimerRef.current = setInterval(() => {
+        seconds += 1;
+        setCallDuration(seconds);
+
+        if (seconds > 0 && seconds % 60 === 0) {
+          const minuteNum = Math.floor(seconds / 60);
+          const activePartner = callPartnerRef.current;
+          if (activePartner) {
+            api.deductCallMinute({
+              receiver_id: activePartner.id,
+              call_type: callTypeRef.current || 'video'
+            }).then(res => {
+              if (res.success) {
+                updateBalance(res.remaining_coins, undefined);
+                setLatestCoinTick({
+                  amount: res.rate || 20,
+                  minute: minuteNum,
+                  id: Date.now()
+                });
+                setTimeout(() => setLatestCoinTick(null), 4000);
+              }
+            }).catch(err => {
+              console.warn('Minute billing tick error:', err);
+              if (err.message && (err.message.includes('hết Xu') || err.message.includes('không đủ'))) {
+                alert('⚠️ Bạn đã hết Xu để duy trì cuộc gọi! Cuộc gọi kết thúc.');
+                endCurrentCall();
+              }
+            });
+          }
+        }
+      }, 1000);
     });
 
     socket.on('webrtc_offer', async (data) => {
@@ -526,6 +425,7 @@ export const WebRTCProvider = ({ children }) => {
     });
 
     return () => {
+      socket.off('call_ringing');
       socket.off('call_accepted');
       socket.off('webrtc_offer');
       socket.off('webrtc_answer');
@@ -582,35 +482,14 @@ export const WebRTCProvider = ({ children }) => {
       }
     }
 
-    // Check if partner is BUSY in another call
-    if (targetPartner.is_in_call) {
-      const res = await api.getBusySuggestions(targetPartner.id).catch(() => ({}));
-      setBusyCallData({
-        message: `${targetPartner.full_name} hiện đang bận cuộc gọi với người khác!`,
-        busyUser: { id: targetPartner.id, full_name: targetPartner.full_name, avatar: targetPartner.avatar },
-        suggestions: res.suggestions || []
-      });
-      return;
-    }
-
-    // Check if partner is OFFLINE (if not a host)
-    if (!targetPartner.is_online && !targetPartner.is_host) {
-      const res = await api.getBusySuggestions(targetPartner.id).catch(() => ({}));
-      setBusyCallData({
-        message: `${targetPartner.full_name} hiện đang ngoại tuyến!`,
-        busyUser: { id: targetPartner.id, full_name: targetPartner.full_name, avatar: targetPartner.avatar },
-        suggestions: res.suggestions || []
-      });
-      return;
-    }
-
     callPartnerRef.current = targetPartner;
     setCallPartner(targetPartner);
     setCallType(type);
     setIsInCall(true);
+    setIsRinging(true);
     setInCallMessages([]);
 
-    const stream = await initializeMedia(type === 'video');
+    const stream = await initializeMedia(type !== 'voice');
     const pc = await createPeerConnection(stream);
 
     try {
@@ -637,9 +516,11 @@ export const WebRTCProvider = ({ children }) => {
     setCallType(callData.callType || 'video');
     partnerSocketIdRef.current = callData.callerSocketId;
     setIsInCall(true);
+    setIsRinging(false);
     setInCallMessages([]);
 
-    const stream = await initializeMedia(callData.callType !== 'voice');
+    const isVideo = (callData.callType || 'video') !== 'voice';
+    const stream = await initializeMedia(isVideo);
     const pc = await createPeerConnection(stream);
 
     try {
@@ -704,11 +585,6 @@ export const WebRTCProvider = ({ children }) => {
     clearInterval(durationTimerRef.current);
     clearInterval(billingTimerRef.current);
 
-    if (simulatedIntervalsRef.current.length > 0) {
-      simulatedIntervalsRef.current.forEach(id => clearInterval(id));
-      simulatedIntervalsRef.current = [];
-    }
-
     if (peerConnectionRef.current) {
       try {
         peerConnectionRef.current.ontrack = null;
@@ -741,6 +617,7 @@ export const WebRTCProvider = ({ children }) => {
     pendingIceCandidatesRef.current = [];
     incomingIceCandidatesQueueRef.current = [];
     setIsInCall(false);
+    setIsRinging(false);
     setCallPartner(null);
     setCallDuration(0);
     setLatestCoinTick(null);
@@ -820,6 +697,7 @@ export const WebRTCProvider = ({ children }) => {
   return (
     <WebRTCContext.Provider value={{
       isInCall,
+      isRinging,
       callPartner,
       callType,
       callDuration,

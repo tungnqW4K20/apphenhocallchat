@@ -132,28 +132,11 @@ function setupSockets(io) {
             });
           });
           socket.emit('call_ringing', { receiver: { id: receiver.id, full_name: receiver.full_name, avatar: receiver.avatar } });
-        } else if (receiver.is_host || receiver.id <= 25) {
-          // AI Idol Seed Host fallback (only for built-in seed accounts without 2nd tab)
-          const hasFree2MinVoucher = await dataService.consumeFreeCallVoucher(callerId);
-          const receiverWatermark = securityService.generateCallWatermark(receiver.id, receiver.full_name, receiver.role);
-
-          if (callerId) dataService.updateUser(callerId, { is_in_call: true }).catch(console.error);
-          if (receiver.id) dataService.updateUser(receiver.id, { is_in_call: true }).catch(console.error);
-
-          socket.emit('call_accepted', {
-            receiverSocketId: `host_${receiver.id}`,
-            receiverId: receiver.id,
-            answer: null,
-            hasFree2MinVoucher,
-            watermark: receiverWatermark
-          });
-
-          startCallBilling(io, socket.id, `host_${receiver.id}`, callerId, receiver.id, callType || 'direct_video', null, hasFree2MinVoucher);
         } else {
           // Real registered user who is currently not connected on socket
           const suggestions = await dataService.getBusyCallSuggestions(callerId, receiverId, 4);
           return socket.emit('call_busy', {
-            message: `${receiver.full_name} hiện không có kết nối trực tuyến!`,
+            message: `${receiver.full_name} hiện không có kết nối trực tuyến (chưa mở app)! Hãy thử lại khi đối phương online hoặc chọn người khác bên dưới.`,
             busyUser: { id: receiver.id, full_name: receiver.full_name, avatar: receiver.avatar },
             suggestions
           });
