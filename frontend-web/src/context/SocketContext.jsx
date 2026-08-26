@@ -27,7 +27,13 @@ export const SocketProvider = ({ children }) => {
 
     const newSocket = io(SOCKET_URL, {
       query: { userId: currentUser.id },
-      transports: ['websocket', 'polling']
+      transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      timeout: 20000,
+      autoConnect: true
     });
 
     newSocket.on('connect', () => {
@@ -37,8 +43,27 @@ export const SocketProvider = ({ children }) => {
       }
     });
 
+    newSocket.on('reconnect', (attemptNumber) => {
+      console.log('🔄 Socket reconnected successfully (Attempt:', attemptNumber, 'ID:', newSocket.id, ')');
+      if (currentUser?.id) {
+        newSocket.emit('register_user', { userId: currentUser.id });
+      }
+    });
+
+    newSocket.on('disconnect', (reason) => {
+      console.warn('⚠️ Socket disconnected reason:', reason);
+      if (reason === 'io server disconnect') {
+        // the disconnection was initiated by the server, reconnect manually
+        newSocket.connect();
+      }
+    });
+
+    newSocket.on('connect_error', (error) => {
+      console.warn('⚡ Socket connection error:', error.message);
+    });
+
     newSocket.on('incoming_call', (data) => {
-      console.log('📞 Incoming call from:', data.caller.full_name);
+      console.log('📞 Incoming call from:', data.caller?.full_name);
       setIncomingCall(data);
     });
 
@@ -61,7 +86,14 @@ export const SocketProvider = ({ children }) => {
 
     setSocket(newSocket);
 
+    // Keep-alive heartbeat ping every 3 minutes to prevent Render free instance sleeping
+    const keepAliveTimer = setInterval(() => {
+      const pingUrl = isLocal ? 'http://localhost:5001/api/ping' : 'https://dating-backend-islg.onrender.com/api/ping';
+      fetch(pingUrl).catch(() => {});
+    }, 180000);
+
     return () => {
+      clearInterval(keepAliveTimer);
       newSocket.disconnect();
     };
   }, [currentUser?.id]);

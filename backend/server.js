@@ -29,8 +29,13 @@ const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
     origin: '*', // Allow all origins for dev / mobile / web
-    methods: ['GET', 'POST', 'PUT', 'DELETE']
-  }
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    credentials: true
+  },
+  pingTimeout: 60000,
+  pingInterval: 25000,
+  transports: ['websocket', 'polling'],
+  allowEIO3: true
 });
 
 // Middleware
