@@ -18,7 +18,9 @@ import {
   Send,
   X,
   Volume2,
-  VolumeX
+  VolumeX,
+  Smartphone,
+  Tv
 } from 'lucide-react';
 import { GiftDrawer } from './GiftDrawer';
 
@@ -57,6 +59,9 @@ export const VideoCallModal = ({ onOpenReport }) => {
   const [isRemoteVideoPlaying, setIsRemoteVideoPlaying] = useState(false);
   const [isAudioMutedByPolicy, setIsAudioMutedByPolicy] = useState(false);
   const [showConnectingNotice, setShowConnectingNotice] = useState(true);
+  
+  // Desktop view mode: 'phone' (9:16 Frame) or 'fill' (Expanded)
+  const [viewMode, setViewMode] = useState('phone');
 
   const chatEndRef = useRef(null);
 
@@ -182,35 +187,44 @@ export const VideoCallModal = ({ onOpenReport }) => {
 
   const quickReactions = ['❤️', '😍', '🔥', '👏', '💋', '✨', '🌹'];
   const partnerAvatar = callPartner.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800';
-
   const hasActiveRemoteVideo = isRemoteVideoPlaying || !!remoteStream;
 
   return (
     <div 
       onContextMenu={(e) => e.preventDefault()}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black animate-fade-in overflow-hidden select-none"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-2xl animate-fade-in overflow-hidden select-none"
     >
+      {/* Ambient Blurred Video Background for Desktop */}
+      <div 
+        className="absolute inset-0 filter blur-3xl scale-125 opacity-30 pointer-events-none hidden md:block bg-cover bg-center"
+        style={{ backgroundImage: `url(${partnerAvatar})` }}
+      />
+
       {/* Privacy Protection Screen Blur when window lost focus */}
       {isBlurredByPrivacy && (
-        <div className="absolute inset-0 z-50 bg-black/90 backdrop-blur-3xl flex flex-col items-center justify-center text-center p-6 space-y-3">
+        <div className="absolute inset-0 z-50 bg-black/95 backdrop-blur-3xl flex flex-col items-center justify-center text-center p-6 space-y-3">
           <span className="text-4xl">🛡️</span>
           <h3 className="text-lg font-black text-white">Chế Độ Bảo Mật Quyền Riêng Tư</h3>
           <p className="text-xs text-gray-400">Cuộc gọi đang được làm mờ bảo vệ dữ liệu cá nhân khi bạn chuyển cửa sổ.</p>
         </div>
       )}
 
-      {/* Dynamic Moving Watermark Overlay (Anti-Screen Recording) */}
-      <div 
-        style={{ top: watermarkPos.top, left: watermarkPos.left }}
-        className="absolute z-40 pointer-events-none transition-all duration-1000 select-none opacity-25 hover:opacity-10 text-[11px] font-mono font-black text-white/80 bg-black/40 px-2.5 py-1 rounded-full border border-white/20 backdrop-blur-sm"
-      >
-        <span>ID:{currentUser?.id} • {currentUser?.full_name?.split(' ')[0]} • AYARFLAME SECURE</span>
-      </div>
-      
-      {/* Remote Fullscreen Video & Live Face Feed (Main Screen) */}
-      <div className="relative w-full h-full flex items-center justify-center bg-black overflow-hidden">
+      {/* Main Viewport: Fullscreen on Mobile, 9:16 Phone Frame (or Expanded) on Desktop */}
+      <div className={`relative w-full h-full md:transition-all md:duration-300 flex items-center justify-center bg-black overflow-hidden shadow-2xl ${
+        viewMode === 'phone' 
+          ? 'md:max-w-[440px] md:h-[92vh] md:max-h-[860px] md:rounded-[40px] md:border-4 md:border-white/15 md:ring-1 md:ring-white/10' 
+          : 'md:max-w-full md:h-full md:rounded-none'
+      }`}>
         
-        {/* WebRTC Video Track (Full Screen Live Camera of Partner) */}
+        {/* Dynamic Moving Watermark Overlay */}
+        <div 
+          style={{ top: watermarkPos.top, left: watermarkPos.left }}
+          className="absolute z-40 pointer-events-none transition-all duration-1000 select-none opacity-25 hover:opacity-10 text-[10px] font-mono font-black text-white/80 bg-black/40 px-2.5 py-1 rounded-full border border-white/20 backdrop-blur-sm"
+        >
+          <span>ID:{currentUser?.id} • {currentUser?.full_name?.split(' ')[0]} • AYARFLAME SECURE</span>
+        </div>
+
+        {/* WebRTC Video Track (9:16 Vertical Video Stream of Partner) */}
         <video
           ref={remoteVideoRef}
           autoPlay
@@ -240,7 +254,7 @@ export const VideoCallModal = ({ onOpenReport }) => {
           {showConnectingNotice && (
             <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center p-6 text-center space-y-3 z-10 transition-opacity duration-500 animate-fade-in">
               <div className="w-12 h-12 rounded-full border-4 border-rose-500 border-t-transparent animate-spin" />
-              <p className="text-sm font-bold text-white shadow">Đang đồng bộ luồng Camera HD với {callPartner.full_name}...</p>
+              <p className="text-sm font-bold text-white shadow">Đang đồng bộ luồng Camera 9:16 HD với {callPartner.full_name}...</p>
             </div>
           )}
         </div>
@@ -249,7 +263,7 @@ export const VideoCallModal = ({ onOpenReport }) => {
         {isAudioMutedByPolicy && (
           <button
             onClick={handleUnmuteAudio}
-            className="absolute top-20 right-6 z-40 bg-gradient-to-r from-rose-500 to-pink-500 text-white px-4 py-2 rounded-full text-xs font-bold shadow-2xl animate-bounce flex items-center gap-2 border border-white/20"
+            className="absolute top-20 left-4 right-4 sm:left-auto sm:right-6 z-40 bg-gradient-to-r from-rose-500 to-pink-500 text-white px-4 py-2 rounded-full text-xs font-bold shadow-2xl animate-bounce flex items-center justify-center gap-2 border border-white/20"
           >
             <VolumeX className="w-4 h-4 text-white" />
             <span>Bấm để bật âm thanh đối phương</span>
@@ -257,22 +271,81 @@ export const VideoCallModal = ({ onOpenReport }) => {
         )}
 
         {/* Live Camera Broadcast Vignette & Gradients */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/60 pointer-events-none z-25" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-black/70 pointer-events-none z-25" />
 
-        {/* Live Camera Status Badge */}
-        <div className="absolute top-20 left-6 z-30 flex items-center gap-2 px-3 py-1 rounded-full bg-black/60 backdrop-blur-md border border-white/10 shadow-lg">
-          <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
-          <span className="text-[11px] font-bold text-white tracking-wide">1080P HD 60FPS</span>
-          <Volume2 className="w-3.5 h-3.5 text-rose-400 animate-pulse ml-1" />
+        {/* Top Header Bar */}
+        <div className="absolute top-0 inset-x-0 z-30 p-4 sm:p-5 flex items-center justify-between">
+          
+          {/* Partner Info */}
+          <div className="flex items-center gap-2.5">
+            <img
+              src={partnerAvatar}
+              alt={callPartner.full_name}
+              className="w-11 h-11 rounded-full object-cover ring-2 ring-rose-500 shadow-xl"
+            />
+            <div>
+              <div className="flex items-center gap-1.5">
+                <h4 className="font-extrabold text-sm text-white drop-shadow-md truncate max-w-[120px] sm:max-w-[160px]">
+                  {callPartner.full_name}
+                </h4>
+                <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-rose-500 text-white shadow">
+                  {callPartner.age || 22}
+                </span>
+              </div>
+              <p className="text-[11px] text-gray-300 font-medium drop-shadow flex items-center gap-1">
+                <span>{callPartner.city || 'Việt Nam'}</span>
+                <span>•</span>
+                <span className="text-emerald-400 font-semibold">9:16 HD Live</span>
+              </p>
+            </div>
+          </div>
+
+          {/* Call Timer & Controls */}
+          <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/60 border border-white/10 backdrop-blur-md shadow-lg">
+              <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
+              <span className="font-mono font-bold text-xs text-white">
+                {formatDuration(callDuration)}
+              </span>
+            </div>
+
+            {/* Desktop Frame Mode Switch (9:16 Phone Frame vs Fullscreen) */}
+            <button
+              onClick={() => setViewMode(viewMode === 'phone' ? 'fill' : 'phone')}
+              className="hidden md:flex p-2 rounded-full bg-black/60 hover:bg-black/80 text-gray-300 hover:text-white border border-white/10 backdrop-blur-md transition-all shadow"
+              title={viewMode === 'phone' ? 'Chuyển sang Toàn màn hình' : 'Chuyển sang Khung Điện Thoại 9:16'}
+            >
+              {viewMode === 'phone' ? <Tv className="w-3.5 h-3.5" /> : <Smartphone className="w-3.5 h-3.5" />}
+            </button>
+
+            <button
+              onClick={() => onOpenReport(callPartner)}
+              className="p-2 rounded-full bg-black/60 hover:bg-black/80 text-gray-300 hover:text-rose-400 border border-white/10 backdrop-blur-md transition-all shadow"
+              title="Báo cáo người dùng"
+            >
+              <ShieldAlert className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
         </div>
 
-        {/* Live Soundwave Visualizer on Bottom Left */}
-        <div className="absolute bottom-28 left-6 z-30 flex items-end gap-1 pointer-events-none">
+        {/* Live Minute Coin Deduction Toast */}
+        {latestCoinTick && (
+          <div className="absolute top-16 right-4 z-40 animate-bounce pointer-events-none">
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-amber-500/90 text-black font-black text-[11px] shadow-2xl backdrop-blur-md border border-amber-300">
+              <Coins className="w-3.5 h-3.5" />
+              <span>-{latestCoinTick.amount} Xu (Phút {latestCoinTick.minute})</span>
+            </div>
+          </div>
+        )}
+
+        {/* Soundwave Visualizer on Bottom Left */}
+        <div className="absolute bottom-24 left-4 z-30 flex items-end gap-1 pointer-events-none">
           <span className="w-1 h-3 bg-rose-500 rounded-full animate-bounce [animation-delay:0ms]" />
-          <span className="w-1 h-6 bg-pink-400 rounded-full animate-bounce [animation-delay:150ms]" />
-          <span className="w-1 h-4 bg-purple-400 rounded-full animate-bounce [animation-delay:300ms]" />
-          <span className="w-1 h-7 bg-rose-400 rounded-full animate-bounce [animation-delay:75ms]" />
-          <span className="w-1 h-5 bg-pink-500 rounded-full animate-bounce [animation-delay:200ms]" />
+          <span className="w-1 h-5 bg-pink-400 rounded-full animate-bounce [animation-delay:150ms]" />
+          <span className="w-1 h-3.5 bg-purple-400 rounded-full animate-bounce [animation-delay:300ms]" />
+          <span className="w-1 h-6 bg-rose-400 rounded-full animate-bounce [animation-delay:75ms]" />
+          <span className="w-1 h-4 bg-pink-500 rounded-full animate-bounce [animation-delay:200ms]" />
         </div>
 
         {/* Floating Gift Animations Overlay */}
@@ -282,11 +355,11 @@ export const VideoCallModal = ({ onOpenReport }) => {
               key={item.id}
               className="absolute top-1/3 inset-x-0 mx-auto w-max flex flex-col items-center animate-gift-pop"
             >
-              <div className="text-7xl sm:text-8xl drop-shadow-[0_10px_20px_rgba(0,0,0,0.8)] filter">
+              <div className="text-6xl sm:text-7xl drop-shadow-[0_10px_20px_rgba(0,0,0,0.8)] filter">
                 {item.gift.icon}
               </div>
-              <div className="mt-2 px-4 py-1.5 rounded-full bg-black/80 backdrop-blur-md border border-pink-500/40 text-center">
-                <p className="text-xs font-black text-pink-300">
+              <div className="mt-2 px-3 py-1 rounded-full bg-black/80 backdrop-blur-md border border-pink-500/40 text-center">
+                <p className="text-[11px] font-black text-pink-300">
                   {item.senderName} đã tặng {item.gift.name}!
                 </p>
               </div>
@@ -294,85 +367,23 @@ export const VideoCallModal = ({ onOpenReport }) => {
           ))}
         </div>
 
-        {/* Floating In-Call Chat Messages */}
-        <div className="absolute bottom-28 left-20 z-30 max-w-xs sm:max-w-sm space-y-2 pointer-events-none">
-          {inCallMessages.slice(-4).map((msg) => (
+        {/* Floating In-Call Chat Messages (Bottom Left) */}
+        <div className="absolute bottom-24 left-16 right-28 z-30 space-y-1.5 pointer-events-none">
+          {inCallMessages.slice(-3).map((msg) => (
             <div
               key={msg.id}
-              className="bg-black/60 backdrop-blur-md px-3.5 py-1.5 rounded-2xl border border-white/10 text-xs text-white shadow-lg animate-fade-in flex items-center gap-2"
+              className="bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-2xl border border-white/10 text-[11px] text-white shadow-lg animate-fade-in flex items-center gap-1.5 w-max max-w-full"
             >
-              <span className="font-bold text-rose-400 text-[11px]">{msg.senderName}:</span>
-              <span className="text-gray-100">{msg.content}</span>
+              <span className="font-bold text-rose-400">{msg.senderName}:</span>
+              <span className="text-gray-100 truncate">{msg.content}</span>
             </div>
           ))}
         </div>
 
-        {/* Top Header Bar */}
-        <div className="absolute top-0 inset-x-0 z-30 p-4 sm:p-6 bg-gradient-to-b from-black/90 via-black/40 to-transparent flex items-center justify-between">
-          
-          {/* Partner Info */}
-          <div className="flex items-center gap-3">
-            <img
-              src={partnerAvatar}
-              alt={callPartner.full_name}
-              className="w-12 h-12 rounded-full object-cover ring-2 ring-rose-500 shadow-xl"
-            />
-            <div>
-              <div className="flex items-center gap-1.5">
-                <h4 className="font-extrabold text-base text-white drop-shadow-md">
-                  {callPartner.full_name}
-                </h4>
-                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-500 text-white shadow">
-                  {callPartner.age || 22}
-                </span>
-              </div>
-              <p className="text-xs text-gray-300 font-medium drop-shadow flex items-center gap-1">
-                <span>{callPartner.city || 'Việt Nam'}</span>
-                <span>•</span>
-                <span>{callPartner.is_host ? `Host (${callPartner.call_rate_per_min || 20}🪙/p)` : '1v1 Video Match'}</span>
-              </p>
-            </div>
-          </div>
-
-          {/* Call Timer & Coin Meter */}
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-black/60 border border-white/10 backdrop-blur-md shadow-lg">
-              <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping" />
-              <span className="font-mono font-bold text-sm text-white">
-                {formatDuration(callDuration)}
-              </span>
-            </div>
-
-            <div className="hidden sm:flex items-center gap-1 px-3 py-1.5 rounded-full bg-amber-500/20 border border-amber-500/30 text-amber-300 text-xs font-bold backdrop-blur-md shadow">
-              <Coins className="w-3.5 h-3.5" />
-              <span>{currentUser?.coins || 0} Xu</span>
-            </div>
-
-            <button
-              onClick={() => onOpenReport(callPartner)}
-              className="p-2 rounded-full bg-black/60 hover:bg-black/80 text-gray-300 hover:text-rose-400 border border-white/10 backdrop-blur-md transition-all shadow"
-              title="Báo cáo người dùng"
-            >
-              <ShieldAlert className="w-4 h-4" />
-            </button>
-          </div>
-
-        </div>
-
-        {/* Live Minute Coin Deduction Toast */}
-        {latestCoinTick && (
-          <div className="absolute top-20 right-6 z-40 animate-bounce pointer-events-none">
-            <div className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-amber-500/90 text-black font-black text-xs shadow-2xl backdrop-blur-md border border-amber-300">
-              <Coins className="w-4 h-4" />
-              <span>-{latestCoinTick.amount} Xu (Phút {latestCoinTick.minute})</span>
-            </div>
-          </div>
-        )}
-
-        {/* PIP Local Video (My Camera Feed - Bạn) */}
+        {/* PIP Local Video (My Camera Feed - 9:16 Portrait Ratio) */}
         <div 
-          className={`absolute bottom-28 right-4 sm:right-6 z-30 rounded-3xl overflow-hidden border-2 border-rose-500/60 shadow-2xl bg-zinc-900 transition-all duration-300 ${
-            isPipSmall ? 'w-24 h-32' : 'w-36 h-48 sm:w-48 sm:h-64'
+          className={`absolute bottom-24 right-3 z-30 rounded-2xl overflow-hidden border-2 border-rose-500/70 shadow-2xl bg-zinc-900 transition-all duration-300 aspect-[9/16] ${
+            isPipSmall ? 'w-20 sm:w-24' : 'w-28 sm:w-32'
           }`}
         >
           <video
@@ -385,26 +396,23 @@ export const VideoCallModal = ({ onOpenReport }) => {
             }`}
           />
           {(!localStream || isVideoDisabled) && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#151420] p-2">
-              <div className="relative">
-                <img
-                  src={currentUser?.avatar || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300'}
-                  alt="My Avatar"
-                  className="w-16 h-16 rounded-full object-cover ring-2 ring-rose-500 mb-1.5 shadow-lg"
-                />
-                <span className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full bg-emerald-500 ring-2 ring-[#151420]" />
-              </div>
-              <span className="text-[11px] font-bold text-white">{currentUser?.full_name || 'Bạn'}</span>
-              <span className="text-[9px] text-gray-400 mt-0.5">{isVideoDisabled ? 'Đã tắt cam' : 'HD Camera'}</span>
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#151420] p-1.5 text-center">
+              <img
+                src={currentUser?.avatar || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200'}
+                alt="My Avatar"
+                className="w-10 h-10 rounded-full object-cover ring-1 ring-rose-500 mb-1 shadow"
+              />
+              <span className="text-[10px] font-bold text-white leading-tight truncate w-full">{currentUser?.full_name?.split(' ')[0] || 'Bạn'}</span>
+              <span className="text-[8px] text-gray-400">{isVideoDisabled ? 'Tắt cam' : 'HD Cam'}</span>
             </div>
           )}
           <button
             onClick={() => setIsPipSmall(!isPipSmall)}
-            className="absolute top-2 right-2 p-1.5 rounded-xl bg-black/60 text-white backdrop-blur-sm hover:bg-black/80"
+            className="absolute top-1.5 right-1.5 p-1 rounded-lg bg-black/60 text-white backdrop-blur-sm hover:bg-black/80"
           >
-            {isPipSmall ? <Maximize2 className="w-3 h-3" /> : <Minimize2 className="w-3 h-3" />}
+            {isPipSmall ? <Maximize2 className="w-2.5 h-2.5" /> : <Minimize2 className="w-2.5 h-2.5" />}
           </button>
-          <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded-lg bg-black/60 backdrop-blur-sm text-[10px] font-extrabold text-white flex items-center gap-1">
+          <div className="absolute bottom-1.5 left-1.5 px-1.5 py-0.2 rounded bg-black/70 backdrop-blur-sm text-[9px] font-black text-white flex items-center gap-1">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
             <span>Bạn</span>
           </div>
@@ -412,7 +420,7 @@ export const VideoCallModal = ({ onOpenReport }) => {
 
         {/* In-Call Live Chat Drawer Overlay */}
         {isChatOpen && (
-          <div className="absolute bottom-28 left-4 right-4 sm:right-auto sm:w-96 z-40 bg-[#161424]/95 backdrop-blur-xl border border-white/15 rounded-3xl p-4 shadow-2xl animate-fade-in flex flex-col h-80">
+          <div className="absolute bottom-24 inset-x-3 z-40 bg-[#161424]/95 backdrop-blur-xl border border-white/15 rounded-3xl p-3.5 shadow-2xl animate-fade-in flex flex-col h-72">
             <div className="flex items-center justify-between pb-2 border-b border-white/10 mb-2">
               <div className="flex items-center gap-2">
                 <MessageCircle className="w-4 h-4 text-rose-400" />
@@ -480,86 +488,86 @@ export const VideoCallModal = ({ onOpenReport }) => {
           </div>
         )}
 
-        {/* In-Call Bottom Controls Bar */}
-        <div className="absolute bottom-6 inset-x-0 z-30 px-4 flex items-center justify-center gap-3 sm:gap-4">
+        {/* In-Call Bottom Controls Bar (Ergonomic Mobile Touch Layout) */}
+        <div className="absolute bottom-4 inset-x-0 z-30 px-3 flex items-center justify-center gap-2.5 sm:gap-3">
           
           {/* Mute Button */}
           <button
             onClick={toggleMute}
-            className={`p-3.5 sm:p-4 rounded-full backdrop-blur-xl border transition-all ${
+            className={`p-3 rounded-full backdrop-blur-xl border transition-all ${
               isMuted 
                 ? 'bg-rose-500/30 border-rose-500 text-rose-300' 
                 : 'bg-black/60 border-white/15 text-white hover:bg-white/10'
             }`}
             title={isMuted ? 'Bật Mic' : 'Tắt Mic'}
           >
-            {isMuted ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
+            {isMuted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
           </button>
 
           {/* Toggle Video */}
           <button
             onClick={toggleVideo}
-            className={`p-3.5 sm:p-4 rounded-full backdrop-blur-xl border transition-all ${
+            className={`p-3 rounded-full backdrop-blur-xl border transition-all ${
               isVideoDisabled 
                 ? 'bg-rose-500/30 border-rose-500 text-rose-300' 
                 : 'bg-black/60 border-white/15 text-white hover:bg-white/10'
             }`}
             title={isVideoDisabled ? 'Bật Camera' : 'Tắt Camera'}
           >
-            {isVideoDisabled ? <VideoOff className="w-6 h-6" /> : <VideoIcon className="w-6 h-6" />}
+            {isVideoDisabled ? <VideoOff className="w-5 h-5" /> : <VideoIcon className="w-5 h-5" />}
           </button>
 
           {/* Beauty Filter Toggle */}
           <button
             onClick={toggleBeautyFilter}
-            className={`p-3.5 sm:p-4 rounded-full backdrop-blur-xl border transition-all ${
+            className={`p-3 rounded-full backdrop-blur-xl border transition-all ${
               beautyFilter 
                 ? 'bg-gradient-to-r from-purple-500 to-pink-500 border-pink-400 text-white shadow-lg shadow-pink-500/40 animate-pulse' 
                 : 'bg-black/60 border-white/15 text-gray-300 hover:text-white hover:bg-white/10'
             }`}
             title="Bộ lọc làm đẹp da HD"
           >
-            <Sparkles className="w-6 h-6 text-amber-300" />
+            <Sparkles className="w-5 h-5 text-amber-300" />
           </button>
 
           {/* In-Call Live Chat Toggle */}
           <button
             onClick={() => setIsChatOpen(!isChatOpen)}
-            className={`p-3.5 sm:p-4 rounded-full backdrop-blur-xl border transition-all ${
+            className={`p-3 rounded-full backdrop-blur-xl border transition-all ${
               isChatOpen
                 ? 'bg-rose-500 text-white border-rose-400 shadow-lg shadow-rose-500/30'
                 : 'bg-black/60 border-white/15 text-gray-300 hover:text-white hover:bg-white/10'
             }`}
             title="Nhắn tin trong cuộc gọi"
           >
-            <MessageCircle className="w-6 h-6" />
+            <MessageCircle className="w-5 h-5" />
           </button>
 
           {/* Send Gift Drawer Trigger */}
           <button
             onClick={() => setIsGiftDrawerOpen(true)}
-            className="p-3.5 sm:p-4 rounded-full bg-gradient-to-r from-amber-500 to-yellow-500 border border-yellow-300 text-black shadow-xl shadow-amber-500/30 hover:scale-110 active:scale-95 transition-all"
+            className="p-3 rounded-full bg-gradient-to-r from-amber-500 to-yellow-500 border border-yellow-300 text-black shadow-xl shadow-amber-500/30 hover:scale-110 active:scale-95 transition-all"
             title="Tặng quà hiệu ứng động"
           >
-            <Gift className="w-6 h-6 font-bold" />
+            <Gift className="w-5 h-5 font-bold" />
           </button>
 
           {/* Skip Next Partner (If Random Mode) */}
           <button
             onClick={skipRandomPartner}
-            className="p-3.5 sm:p-4 rounded-full bg-blue-600/80 hover:bg-blue-600 border border-blue-400/50 text-white shadow-xl shadow-blue-600/30 hover:scale-110 active:scale-95 transition-all flex items-center gap-1.5"
+            className="p-3 rounded-full bg-blue-600/80 hover:bg-blue-600 border border-blue-400/50 text-white shadow-xl shadow-blue-600/30 hover:scale-110 active:scale-95 transition-all flex items-center gap-1.5"
             title="Đổi sang người khác (Next)"
           >
-            <SkipForward className="w-6 h-6" />
+            <SkipForward className="w-5 h-5" />
           </button>
 
           {/* Hang Up End Call */}
           <button
             onClick={endCurrentCall}
-            className="p-3.5 sm:p-4 rounded-full bg-red-600 hover:bg-red-700 border border-red-400 text-white shadow-2xl shadow-red-600/40 hover:scale-110 active:scale-95 transition-all"
+            className="p-3 rounded-full bg-red-600 hover:bg-red-700 border border-red-400 text-white shadow-2xl shadow-red-600/40 hover:scale-110 active:scale-95 transition-all"
             title="Kết thúc cuộc gọi"
           >
-            <PhoneOff className="w-6 h-6" />
+            <PhoneOff className="w-5 h-5" />
           </button>
         </div>
 

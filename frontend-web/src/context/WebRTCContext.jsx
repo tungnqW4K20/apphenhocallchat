@@ -132,11 +132,17 @@ export const WebRTCProvider = ({ children }) => {
     }
   };
 
-  // Helper: Create a high-quality simulated stream with BOTH Video and Web Audio tracks
+  // Helper: Create a high-quality simulated stream with BOTH Video and Web Audio tracks (Mobile 9:16 or Desktop 16:9)
   const createSimulatedMediaStream = (user, label = 'HD Camera Live') => {
+    const isMobileOrPortrait = typeof window !== 'undefined' && (
+      window.innerHeight > window.innerWidth || 
+      window.innerWidth <= 768 ||
+      /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+    );
+
     const canvas = document.createElement('canvas');
-    canvas.width = 1280;
-    canvas.height = 720;
+    canvas.width = isMobileOrPortrait ? 720 : 1280;
+    canvas.height = isMobileOrPortrait ? 1280 : 720;
     const ctx = canvas.getContext('2d');
 
     const avatarImg = new Image();
@@ -155,24 +161,26 @@ export const WebRTCProvider = ({ children }) => {
       ctx.fillStyle = grad;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      // Subtle dynamic glow ring
+      const centerX = canvas.width / 2;
+      const centerY = isMobileOrPortrait ? canvas.height / 2 - 60 : canvas.height / 2 - 30;
+      const baseRadius = isMobileOrPortrait ? 160 : 130;
+
+      // Dynamic glow ring
       const glowGrad = ctx.createRadialGradient(
-        canvas.width / 2, canvas.height / 2 - 30, 80,
-        canvas.width / 2, canvas.height / 2 - 30, 240
+        centerX, centerY, 80,
+        centerX, centerY, baseRadius * 1.8
       );
       glowGrad.addColorStop(0, 'rgba(244, 63, 94, 0.25)');
       glowGrad.addColorStop(0.7, 'rgba(168, 85, 247, 0.1)');
       glowGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
       ctx.fillStyle = glowGrad;
       ctx.beginPath();
-      ctx.arc(canvas.width / 2, canvas.height / 2 - 30, 240, 0, Math.PI * 2);
+      ctx.arc(centerX, centerY, baseRadius * 1.8, 0, Math.PI * 2);
       ctx.fill();
 
       // Avatar with smooth breathing zoom
       const zoom = 1 + Math.sin(step) * 0.025;
-      const radius = 140 * zoom;
-      const centerX = canvas.width / 2;
-      const centerY = canvas.height / 2 - 30;
+      const radius = baseRadius * zoom;
 
       ctx.save();
       ctx.beginPath();
@@ -205,23 +213,23 @@ export const WebRTCProvider = ({ children }) => {
       ctx.stroke();
 
       // Soundwave bars below avatar
-      const waveY = centerY + radius + 40;
-      for (let i = -5; i <= 5; i++) {
-        const barHeight = Math.abs(Math.sin(step * 2 + i * 0.6)) * 28 + 6;
+      const waveY = centerY + radius + (isMobileOrPortrait ? 50 : 35);
+      for (let i = -6; i <= 6; i++) {
+        const barHeight = Math.abs(Math.sin(step * 2 + i * 0.5)) * 32 + 8;
         ctx.fillStyle = i % 2 === 0 ? '#FD297B' : '#A855F7';
-        ctx.fillRect(centerX + i * 14 - 3, waveY - barHeight / 2, 6, barHeight);
+        ctx.fillRect(centerX + i * 16 - 3, waveY - barHeight / 2, 7, barHeight);
       }
 
       // Name & Status Badge
-      const badgeW = 280;
-      const badgeH = 44;
+      const badgeW = isMobileOrPortrait ? 320 : 280;
+      const badgeH = isMobileOrPortrait ? 50 : 44;
       const badgeX = centerX - badgeW / 2;
-      const badgeY = canvas.height - 90;
+      const badgeY = canvas.height - (isMobileOrPortrait ? 180 : 90);
 
       ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
       if (ctx.roundRect) {
         ctx.beginPath();
-        ctx.roundRect(badgeX, badgeY, badgeW, badgeH, 22);
+        ctx.roundRect(badgeX, badgeY, badgeW, badgeH, badgeH / 2);
         ctx.fill();
       } else {
         ctx.fillRect(badgeX, badgeY, badgeW, badgeH);
@@ -235,13 +243,12 @@ export const WebRTCProvider = ({ children }) => {
 
       // Text
       ctx.fillStyle = '#FFFFFF';
-      ctx.font = 'bold 16px sans-serif';
+      ctx.font = isMobileOrPortrait ? 'bold 18px sans-serif' : 'bold 16px sans-serif';
       const nameText = user?.full_name || label;
-      ctx.fillText(nameText, badgeX + 44, badgeY + badgeH / 2 + 5);
+      ctx.fillText(nameText, badgeX + 44, badgeY + badgeH / 2 + 6);
     };
 
     render();
-    // Using 30 FPS setInterval guarantees rendering continues even when tab is in background
     const intervalId = setInterval(render, 1000 / 30);
     simulatedIntervalsRef.current.push(intervalId);
 
@@ -288,10 +295,29 @@ export const WebRTCProvider = ({ children }) => {
         return localStreamRef.current;
       }
 
+      const isMobileOrPortrait = typeof window !== 'undefined' && (
+        window.innerHeight > window.innerWidth || 
+        window.innerWidth <= 768 ||
+        /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+      );
+
       if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        // Adjust camera constraints dynamically: 9:16 for Mobile/Portrait or 16:9 for Desktop
+        const videoConstraints = isVideo ? {
+          width: isMobileOrPortrait ? { ideal: 720, min: 480 } : { ideal: 1280, min: 640 },
+          height: isMobileOrPortrait ? { ideal: 1280, min: 640 } : { ideal: 720, min: 480 },
+          aspectRatio: isMobileOrPortrait ? { ideal: 0.5625 } : { ideal: 1.7777 },
+          facingMode: 'user',
+          frameRate: { ideal: 30, max: 60 }
+        } : false;
+
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: isVideo ? { width: { ideal: 1280, min: 640 }, height: { ideal: 720, min: 480 }, facingMode: 'user' } : false,
-          audio: true
+          video: videoConstraints,
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true
+          }
         });
 
         localStreamRef.current = stream;
