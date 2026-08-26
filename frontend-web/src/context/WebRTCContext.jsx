@@ -6,6 +6,7 @@ import confetti from 'canvas-confetti';
 
 const WebRTCContext = createContext(null);
 
+// High-speed reliable STUN servers for WebRTC P2P & NAT traversal
 const ICE_SERVERS = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
@@ -14,23 +15,7 @@ const ICE_SERVERS = {
     { urls: 'stun:stun3.l.google.com:19302' },
     { urls: 'stun:stun4.l.google.com:19302' },
     { urls: 'stun:stun.cloudflare.com:3478' },
-    { urls: 'stun:stun.services.mozilla.com' },
-    { urls: 'stun:openrelay.metered.ca:80' },
-    {
-      urls: 'turn:openrelay.metered.ca:80',
-      username: 'openrelayproject',
-      credential: 'openrelayproject'
-    },
-    {
-      urls: 'turn:openrelay.metered.ca:443',
-      username: 'openrelayproject',
-      credential: 'openrelayproject'
-    },
-    {
-      urls: 'turn:openrelay.metered.ca:443?transport=tcp',
-      username: 'openrelayproject',
-      credential: 'openrelayproject'
-    }
+    { urls: 'stun:global.stun.twilio.com:3478' }
   ],
   iceCandidatePoolSize: 10
 };
@@ -72,14 +57,42 @@ export const WebRTCProvider = ({ children }) => {
   const peerConnectionRef = useRef(null);
   const partnerSocketIdRef = useRef(null);
   const pendingIceCandidatesRef = useRef([]);
+  const incomingIceCandidatesQueueRef = useRef([]);
   const callSessionIdRef = useRef(null);
   const durationTimerRef = useRef(null);
   const billingTimerRef = useRef(null);
   const callPartnerRef = useRef(null);
   const callTypeRef = useRef('video');
+  const simulatedIntervalsRef = useRef([]);
 
-  const incomingIceCandidatesQueueRef = useRef([]);
+  const localVideoRef = useRef(null);
+  const remoteVideoRef = useRef(null);
 
+  useEffect(() => {
+    callPartnerRef.current = callPartner;
+  }, [callPartner]);
+
+  useEffect(() => {
+    callTypeRef.current = callType;
+  }, [callType]);
+
+  // Reactively attach local stream to video ref
+  useEffect(() => {
+    if (localVideoRef.current && localStream) {
+      localVideoRef.current.srcObject = localStream;
+      localVideoRef.current.play().catch(() => {});
+    }
+  }, [localStream, isInCall]);
+
+  // Reactively attach remote stream to video ref
+  useEffect(() => {
+    if (remoteVideoRef.current && remoteStream) {
+      remoteVideoRef.current.srcObject = remoteStream;
+      remoteVideoRef.current.play().catch(() => {});
+    }
+  }, [remoteStream, isInCall]);
+
+  // ICE Candidate Queuing & Flushing
   const addOrQueueIceCandidate = async (candidate) => {
     if (!candidate) return;
     if (!peerConnectionRef.current || !peerConnectionRef.current.remoteDescription) {
@@ -119,29 +132,310 @@ export const WebRTCProvider = ({ children }) => {
     }
   };
 
-  useEffect(() => {
-    callPartnerRef.current = callPartner;
-  }, [callPartner]);
+  // Helper: Create a high-quality simulated stream with BOTH Video and Web Audio tracks
+  const createSimulatedMediaStream = (user, label = 'HD Camera Live') => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 1280;
+    canvas.height = 720;
+    const ctx = canvas.getContext('2d');
 
-  useEffect(() => {
-    callTypeRef.current = callType;
-  }, [callType]);
+    const avatarImg = new Image();
+    avatarImg.crossOrigin = 'anonymous';
+    avatarImg.src = user?.avatar || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=500';
 
-  const localVideoRef = useRef(null);
-  const remoteVideoRef = useRef(null);
+    let step = 0;
+    const render = () => {
+      step += 0.04;
+      
+      // Gradient background
+      const grad = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+      grad.addColorStop(0, '#100e1d');
+      grad.addColorStop(0.5, '#19152b');
+      grad.addColorStop(1, '#0c0a17');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  // Reactively attach streams to video elements whenever state changes
-  useEffect(() => {
-    if (localVideoRef.current && localStream) {
-      localVideoRef.current.srcObject = localStream;
+      // Subtle dynamic glow ring
+      const glowGrad = ctx.createRadialGradient(
+        canvas.width / 2, canvas.height / 2 - 30, 80,
+        canvas.width / 2, canvas.height / 2 - 30, 240
+      );
+      glowGrad.addColorStop(0, 'rgba(244, 63, 94, 0.25)');
+      glowGrad.addColorStop(0.7, 'rgba(168, 85, 247, 0.1)');
+      glowGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = glowGrad;
+      ctx.beginPath();
+      ctx.arc(canvas.width / 2, canvas.height / 2 - 30, 240, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Avatar with smooth breathing zoom
+      const zoom = 1 + Math.sin(step) * 0.025;
+      const radius = 140 * zoom;
+      const centerX = canvas.width / 2;
+      const centerY = canvas.height / 2 - 30;
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+      ctx.clip();
+      try {
+        if (avatarImg.complete && avatarImg.naturalWidth > 0) {
+          ctx.drawImage(
+            avatarImg,
+            centerX - radius,
+            centerY - radius,
+            radius * 2,
+            radius * 2
+          );
+        } else {
+          ctx.fillStyle = '#FD297B';
+          ctx.fillRect(centerX - radius, centerY - radius, radius * 2, radius * 2);
+        }
+      } catch (e) {
+        ctx.fillStyle = '#FD297B';
+        ctx.fillRect(centerX - radius, centerY - radius, radius * 2, radius * 2);
+      }
+      ctx.restore();
+
+      // Glowing border around avatar
+      ctx.strokeStyle = '#FD297B';
+      ctx.lineWidth = 6;
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, radius + 2, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Soundwave bars below avatar
+      const waveY = centerY + radius + 40;
+      for (let i = -5; i <= 5; i++) {
+        const barHeight = Math.abs(Math.sin(step * 2 + i * 0.6)) * 28 + 6;
+        ctx.fillStyle = i % 2 === 0 ? '#FD297B' : '#A855F7';
+        ctx.fillRect(centerX + i * 14 - 3, waveY - barHeight / 2, 6, barHeight);
+      }
+
+      // Name & Status Badge
+      const badgeW = 280;
+      const badgeH = 44;
+      const badgeX = centerX - badgeW / 2;
+      const badgeY = canvas.height - 90;
+
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
+      if (ctx.roundRect) {
+        ctx.beginPath();
+        ctx.roundRect(badgeX, badgeY, badgeW, badgeH, 22);
+        ctx.fill();
+      } else {
+        ctx.fillRect(badgeX, badgeY, badgeW, badgeH);
+      }
+
+      // Live green dot
+      ctx.fillStyle = '#10B981';
+      ctx.beginPath();
+      ctx.arc(badgeX + 26, badgeY + badgeH / 2, 6, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Text
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = 'bold 16px sans-serif';
+      const nameText = user?.full_name || label;
+      ctx.fillText(nameText, badgeX + 44, badgeY + badgeH / 2 + 5);
+    };
+
+    render();
+    // Using 30 FPS setInterval guarantees rendering continues even when tab is in background
+    const intervalId = setInterval(render, 1000 / 30);
+    simulatedIntervalsRef.current.push(intervalId);
+
+    const stream = canvas.captureStream(30);
+
+    // Add silent Web Audio track so SDP has both audio & video
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (AudioCtx) {
+        const actx = new AudioCtx();
+        const dest = actx.createMediaStreamDestination();
+        const gain = actx.createGain();
+        gain.gain.value = 0;
+        const osc = actx.createOscillator();
+        osc.connect(gain);
+        gain.connect(dest);
+        osc.start();
+        const track = dest.stream.getAudioTracks()[0];
+        if (track) stream.addTrack(track);
+      }
+    } catch (e) {
+      console.warn('AudioContext destination warning:', e);
     }
-  }, [localStream, isInCall]);
 
-  useEffect(() => {
-    if (remoteVideoRef.current && remoteStream) {
-      remoteVideoRef.current.srcObject = remoteStream;
+    return stream;
+  };
+
+  // Helper: Create animated Live HD Stream for AI Idol Host
+  const createHostLiveStream = (hostUser) => {
+    const stream = createSimulatedMediaStream(hostUser, 'IDOL LIVE 1080P HD');
+    remoteStreamRef.current = stream;
+    setRemoteStream(stream);
+    if (remoteVideoRef.current) {
+      remoteVideoRef.current.srcObject = stream;
+      remoteVideoRef.current.play().catch(() => {});
     }
-  }, [remoteStream, isInCall]);
+    return stream;
+  };
+
+  const initializeMedia = async (isVideo = true) => {
+    try {
+      if (localStreamRef.current && localStreamRef.current.active && localStreamRef.current.getTracks().length > 0) {
+        setLocalStream(localStreamRef.current);
+        return localStreamRef.current;
+      }
+
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: isVideo ? { width: { ideal: 1280, min: 640 }, height: { ideal: 720, min: 480 }, facingMode: 'user' } : false,
+          audio: true
+        });
+
+        localStreamRef.current = stream;
+        setLocalStream(stream);
+
+        if (localVideoRef.current) {
+          localVideoRef.current.srcObject = stream;
+          localVideoRef.current.play().catch(() => {});
+        }
+        return stream;
+      } else {
+        throw new Error('navigator.mediaDevices.getUserMedia is not supported on this origin');
+      }
+    } catch (err) {
+      console.warn('Physical camera/mic not accessible or blocked, generating high-res simulated feed:', err);
+
+      // Attempt to acquire audio only if video failed due to device busy
+      let audioStream = null;
+      try {
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+          audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        }
+      } catch (e) {
+        // audio also busy or denied
+      }
+
+      const mockStream = createSimulatedMediaStream(currentUser, 'HD Camera Live');
+      if (audioStream && audioStream.getAudioTracks().length > 0) {
+        // Replace synthetic audio with real mic
+        const realAudioTrack = audioStream.getAudioTracks()[0];
+        mockStream.getAudioTracks().forEach(t => mockStream.removeTrack(t));
+        mockStream.addTrack(realAudioTrack);
+      }
+
+      localStreamRef.current = mockStream;
+      setLocalStream(mockStream);
+
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = mockStream;
+        localVideoRef.current.play().catch(() => {});
+      }
+      return mockStream;
+    }
+  };
+
+  const createPeerConnection = async (stream) => {
+    if (peerConnectionRef.current) {
+      try {
+        peerConnectionRef.current.close();
+      } catch (e) {}
+      peerConnectionRef.current = null;
+    }
+
+    const pc = new RTCPeerConnection(ICE_SERVERS);
+    peerConnectionRef.current = pc;
+
+    const media = stream || localStreamRef.current;
+    if (media) {
+      media.getTracks().forEach(track => {
+        pc.addTrack(track, media);
+      });
+    }
+
+    pc.onicecandidate = (event) => {
+      if (event.candidate) {
+        if (partnerSocketIdRef.current && socket) {
+          socket.emit('webrtc_ice_candidate', {
+            targetSocketId: partnerSocketIdRef.current,
+            candidate: event.candidate
+          });
+        } else {
+          pendingIceCandidatesRef.current.push(event.candidate);
+        }
+      }
+    };
+
+    pc.ontrack = (event) => {
+      console.log('🎥 Live Remote Media Track Received:', event.track.kind, event);
+      let stream = (event.streams && event.streams[0]) ? event.streams[0] : null;
+      if (!stream) {
+        if (!remoteStreamRef.current) {
+          remoteStreamRef.current = new MediaStream();
+        }
+        remoteStreamRef.current.addTrack(event.track);
+        stream = remoteStreamRef.current;
+      } else {
+        remoteStreamRef.current = stream;
+      }
+      setRemoteStream(stream);
+      if (remoteVideoRef.current) {
+        remoteVideoRef.current.srcObject = stream;
+        remoteVideoRef.current.play().catch((err) => {
+          console.warn('Auto play remote video error:', err);
+        });
+      }
+    };
+
+    pc.oniceconnectionstatechange = () => {
+      console.log('⚡ ICE Connection State:', pc.iceConnectionState);
+    };
+
+    pc.onconnectionstatechange = () => {
+      console.log('⚡ Peer Connection State:', pc.connectionState);
+    };
+
+    setCallDuration(0);
+    clearInterval(durationTimerRef.current);
+    clearInterval(billingTimerRef.current);
+
+    let seconds = 0;
+    durationTimerRef.current = setInterval(() => {
+      seconds += 1;
+      setCallDuration(seconds);
+
+      // Every 60 seconds (1 minute of active call) -> Deduct coin
+      if (seconds > 0 && seconds % 60 === 0) {
+        const minuteNum = Math.floor(seconds / 60);
+        if (callPartnerRef.current) {
+          api.deductCallMinute({
+            receiver_id: callPartnerRef.current.id,
+            call_type: callTypeRef.current || 'video'
+          }).then(res => {
+            if (res.success) {
+              updateBalance(res.remaining_coins, undefined);
+              setLatestCoinTick({
+                amount: res.rate || 20,
+                minute: minuteNum,
+                id: Date.now()
+              });
+              setTimeout(() => setLatestCoinTick(null), 4000);
+            }
+          }).catch(err => {
+            console.warn('Minute billing tick error:', err);
+            if (err.message && (err.message.includes('hết Xu') || err.message.includes('không đủ'))) {
+              alert('⚠️ Bạn đã hết Xu để duy trì cuộc gọi! Cuộc gọi kết thúc.');
+              endCurrentCall();
+            }
+          });
+        }
+      }
+    }, 1000);
+
+    return pc;
+  };
 
   useEffect(() => {
     if (!socket) return;
@@ -149,12 +443,18 @@ export const WebRTCProvider = ({ children }) => {
     socket.on('call_accepted', async (data) => {
       partnerSocketIdRef.current = data.receiverSocketId;
       flushPendingIceCandidates(data.receiverSocketId);
-      if (peerConnectionRef.current && data.answer) {
+
+      if (data.answer && peerConnectionRef.current) {
         try {
           await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(data.answer));
           await flushIncomingIceCandidates();
         } catch (e) {
           console.warn('Set remote desc error:', e);
+        }
+      } else if (!data.answer) {
+        // AI Idol Host mode (seed accounts) -> generate high-res live broadcast stream
+        if (callPartnerRef.current) {
+          createHostLiveStream(callPartnerRef.current);
         }
       }
     });
@@ -323,185 +623,6 @@ export const WebRTCProvider = ({ children }) => {
     }, 4000);
   };
 
-  const initializeMedia = async (isVideo = true) => {
-    try {
-      if (localStreamRef.current) {
-        setLocalStream(localStreamRef.current);
-        return localStreamRef.current;
-      }
-      
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: isVideo ? { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' } : false,
-        audio: true
-      });
-
-      localStreamRef.current = stream;
-      setLocalStream(stream);
-
-      if (localVideoRef.current) {
-        localVideoRef.current.srcObject = stream;
-      }
-      return stream;
-    } catch (err) {
-      console.warn('Physical camera/mic not accessible, rendering simulated camera feed with profile image:', err);
-
-      // Create an animated high-res canvas avatar video feed so user's face is 100% visible!
-      const canvas = document.createElement('canvas');
-      canvas.width = 640;
-      canvas.height = 480;
-      const ctx = canvas.getContext('2d');
-
-      const avatarImg = new Image();
-      avatarImg.crossOrigin = 'anonymous';
-      avatarImg.src = currentUser?.avatar || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=500';
-
-      let step = 0;
-      const renderMock = () => {
-        step += 0.05;
-        ctx.fillStyle = '#14121f';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-        // Draw Avatar with subtle breathing zoom effect
-        const zoom = 1 + Math.sin(step) * 0.02;
-        const w = 240 * zoom;
-        const h = 240 * zoom;
-        const x = (canvas.width - w) / 2;
-        const y = (canvas.height - h) / 2 - 20;
-
-        ctx.save();
-        ctx.beginPath();
-        ctx.arc(canvas.width / 2, canvas.height / 2 - 20, 110, 0, Math.PI * 2);
-        ctx.clip();
-        try {
-          if (avatarImg.complete && avatarImg.naturalWidth > 0) {
-            ctx.drawImage(avatarImg, x, y, w, h);
-          } else {
-            ctx.fillStyle = '#FD297B';
-            ctx.fill();
-          }
-        } catch (e) {
-          ctx.fillStyle = '#FD297B';
-          ctx.fill();
-        }
-        ctx.restore();
-
-        // Glowing border
-        ctx.strokeStyle = '#FD297B';
-        ctx.lineWidth = 4;
-        ctx.beginPath();
-        ctx.arc(canvas.width / 2, canvas.height / 2 - 20, 112, 0, Math.PI * 2);
-        ctx.stroke();
-
-        // Draw Live Badge
-        ctx.fillStyle = 'rgba(0,0,0,0.7)';
-        ctx.roundRect ? ctx.roundRect(canvas.width / 2 - 90, canvas.height - 70, 180, 36, 18) : ctx.fillRect(canvas.width / 2 - 90, canvas.height - 70, 180, 36);
-        ctx.fill();
-
-        ctx.fillStyle = '#10B981';
-        ctx.beginPath();
-        ctx.arc(canvas.width / 2 - 60, canvas.height - 52, 5, 0, Math.PI * 2);
-        ctx.fill();
-
-        ctx.fillStyle = '#FFFFFF';
-        ctx.font = 'bold 13px sans-serif';
-        ctx.fillText(currentUser?.full_name || 'HD Camera Live', canvas.width / 2 - 45, canvas.height - 48);
-
-        requestAnimationFrame(renderMock);
-      };
-
-      renderMock();
-
-      const mockStream = canvas.captureStream(30);
-      localStreamRef.current = mockStream;
-      setLocalStream(mockStream);
-
-      if (localVideoRef.current) {
-        localVideoRef.current.srcObject = mockStream;
-      }
-      return mockStream;
-    }
-  };
-
-  const createPeerConnection = async (stream) => {
-    if (peerConnectionRef.current) return peerConnectionRef.current;
-
-    const pc = new RTCPeerConnection(ICE_SERVERS);
-    peerConnectionRef.current = pc;
-
-    const media = stream || localStreamRef.current;
-    if (media) {
-      media.getTracks().forEach(track => {
-        pc.addTrack(track, media);
-      });
-    }
-
-    pc.onicecandidate = (event) => {
-      if (event.candidate) {
-        if (partnerSocketIdRef.current && socket) {
-          socket.emit('webrtc_ice_candidate', {
-            targetSocketId: partnerSocketIdRef.current,
-            candidate: event.candidate
-          });
-          socket.emit('ice_candidate', {
-            targetSocketId: partnerSocketIdRef.current,
-            candidate: event.candidate
-          });
-        } else {
-          pendingIceCandidatesRef.current.push(event.candidate);
-        }
-      }
-    };
-
-    pc.ontrack = (event) => {
-      console.log('🎥 Live Remote Media Stream Received:', event.streams[0]);
-      remoteStreamRef.current = event.streams[0];
-      setRemoteStream(event.streams[0]);
-      if (remoteVideoRef.current) {
-        remoteVideoRef.current.srcObject = event.streams[0];
-        remoteVideoRef.current.play().catch(() => {});
-      }
-    };
-
-    setCallDuration(0);
-    clearInterval(durationTimerRef.current);
-    clearInterval(billingTimerRef.current);
-
-    let seconds = 0;
-    durationTimerRef.current = setInterval(() => {
-      seconds += 1;
-      setCallDuration(seconds);
-
-      // Every 60 seconds (1 minute of active call) -> Deduct coin
-      if (seconds > 0 && seconds % 60 === 0) {
-        const minuteNum = Math.floor(seconds / 60);
-        if (callPartnerRef.current) {
-          api.deductCallMinute({
-            receiver_id: callPartnerRef.current.id,
-            call_type: callTypeRef.current || 'video'
-          }).then(res => {
-            if (res.success) {
-              updateBalance(res.remaining_coins, undefined);
-              setLatestCoinTick({
-                amount: res.rate || 20,
-                minute: minuteNum,
-                id: Date.now()
-              });
-              setTimeout(() => setLatestCoinTick(null), 4000);
-            }
-          }).catch(err => {
-            console.warn('Minute billing tick error:', err);
-            if (err.message && (err.message.includes('hết Xu') || err.message.includes('không đủ'))) {
-              alert('⚠️ Bạn đã hết Xu để duy trì cuộc gọi! Cuộc gọi kết thúc.');
-              endCurrentCall();
-            }
-          });
-        }
-      }
-    }, 1000);
-
-    return pc;
-  };
-
   const startDirectCall = async (partner, type = 'video') => {
     if (!currentUser || !partner) return;
     if ((currentUser.coins || 0) < 20) {
@@ -533,8 +654,8 @@ export const WebRTCProvider = ({ children }) => {
       return;
     }
 
-    // Check if partner is OFFLINE
-    if (!targetPartner.is_online) {
+    // Check if partner is OFFLINE (if not a host)
+    if (!targetPartner.is_online && !targetPartner.is_host) {
       const res = await api.getBusySuggestions(targetPartner.id).catch(() => ({}));
       setBusyCallData({
         message: `${targetPartner.full_name} hiện đang ngoại tuyến!`,
@@ -602,7 +723,7 @@ export const WebRTCProvider = ({ children }) => {
 
   const startRandomMatchQueue = (genderFilter = 'all', regionFilter = 'all') => {
     if (!socket || !currentUser) return;
-    if ((currentUser.coins || 0) < 20) {
+    if (currentUser.gender !== 'female' && (currentUser.coins || 0) < 20) {
       alert('Bạn cần tối thiểu 20 Xu để tham gia ghép đôi video ngẫu nhiên!');
       return;
     }
@@ -641,19 +762,44 @@ export const WebRTCProvider = ({ children }) => {
   const cleanupCall = () => {
     clearInterval(durationTimerRef.current);
     clearInterval(billingTimerRef.current);
+
+    // Clear all simulated intervals
+    if (simulatedIntervalsRef.current.length > 0) {
+      simulatedIntervalsRef.current.forEach(id => clearInterval(id));
+      simulatedIntervalsRef.current = [];
+    }
+
     if (peerConnectionRef.current) {
-      peerConnectionRef.current.close();
+      try {
+        peerConnectionRef.current.ontrack = null;
+        peerConnectionRef.current.onicecandidate = null;
+        peerConnectionRef.current.close();
+      } catch (e) {
+        console.warn('PeerConnection close error:', e);
+      }
       peerConnectionRef.current = null;
     }
+
     if (localStreamRef.current) {
-      localStreamRef.current.getTracks().forEach(track => track.stop());
+      try {
+        localStreamRef.current.getTracks().forEach(track => track.stop());
+      } catch (e) {}
       localStreamRef.current = null;
     }
-    remoteStreamRef.current = null;
+
+    if (remoteStreamRef.current) {
+      try {
+        remoteStreamRef.current.getTracks().forEach(track => track.stop());
+      } catch (e) {}
+      remoteStreamRef.current = null;
+    }
+
     setLocalStream(null);
     setRemoteStream(null);
     partnerSocketIdRef.current = null;
     callSessionIdRef.current = null;
+    pendingIceCandidatesRef.current = [];
+    incomingIceCandidatesQueueRef.current = [];
     setIsInCall(false);
     setCallPartner(null);
     setCallDuration(0);

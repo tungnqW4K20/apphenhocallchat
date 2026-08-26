@@ -17,8 +17,8 @@ import {
   MessageCircle,
   Send,
   X,
-  Radio,
-  Volume2
+  Volume2,
+  VolumeX
 } from 'lucide-react';
 import { GiftDrawer } from './GiftDrawer';
 
@@ -54,6 +54,9 @@ export const VideoCallModal = ({ onOpenReport }) => {
   const [chatInput, setChatInput] = useState('');
   const [isBlurredByPrivacy, setIsBlurredByPrivacy] = useState(false);
   const [watermarkPos, setWatermarkPos] = useState({ top: '30%', left: '40%' });
+  const [isRemoteVideoPlaying, setIsRemoteVideoPlaying] = useState(false);
+  const [isAudioMutedByPolicy, setIsAudioMutedByPolicy] = useState(false);
+  const [showConnectingNotice, setShowConnectingNotice] = useState(true);
 
   const chatEndRef = useRef(null);
 
@@ -98,19 +101,17 @@ export const VideoCallModal = ({ onOpenReport }) => {
     };
   }, []);
 
-  const [isRemoteVideoPlaying, setIsRemoteVideoPlaying] = useState(false);
-  const [showConnectingNotice, setShowConnectingNotice] = useState(true);
-
   useEffect(() => {
     setShowConnectingNotice(true);
     const timer = setTimeout(() => {
       setShowConnectingNotice(false);
-    }, 2500);
+    }, 2000);
     return () => clearTimeout(timer);
   }, [isInCall, callPartner]);
 
   useEffect(() => {
     setIsRemoteVideoPlaying(false);
+    setIsAudioMutedByPolicy(false);
   }, [isInCall, callPartner]);
 
   useEffect(() => {
@@ -119,35 +120,50 @@ export const VideoCallModal = ({ onOpenReport }) => {
     }
   }, [inCallMessages, isChatOpen]);
 
+  // Robust Stream Attaching & Autoplay Recovery
   useEffect(() => {
-    if (remoteVideoRef?.current && remoteStream) {
-      remoteVideoRef.current.srcObject = remoteStream;
+    if (remoteStream && remoteVideoRef?.current) {
+      if (remoteVideoRef.current.srcObject !== remoteStream) {
+        remoteVideoRef.current.srcObject = remoteStream;
+      }
       const playPromise = remoteVideoRef.current.play();
       if (playPromise !== undefined) {
-        playPromise.then(() => {
-          setIsRemoteVideoPlaying(true);
-        }).catch(() => {
-          // If browser blocks unmuted autoplay, mute briefly to start playback then unmute
-          if (remoteVideoRef.current) {
-            remoteVideoRef.current.muted = true;
-            remoteVideoRef.current.play().then(() => {
-              setIsRemoteVideoPlaying(true);
-              setTimeout(() => {
-                if (remoteVideoRef.current) remoteVideoRef.current.muted = false;
-              }, 500);
-            }).catch(() => {});
-          }
-        });
+        playPromise
+          .then(() => {
+            setIsRemoteVideoPlaying(true);
+            setIsAudioMutedByPolicy(false);
+          })
+          .catch((err) => {
+            console.warn('Remote video audio unmuted autoplay blocked by browser policy:', err);
+            if (remoteVideoRef.current) {
+              remoteVideoRef.current.muted = true;
+              remoteVideoRef.current.play().then(() => {
+                setIsRemoteVideoPlaying(true);
+                setIsAudioMutedByPolicy(true);
+              }).catch(() => {});
+            }
+          });
       }
     }
-  }, [remoteStream]);
+  }, [remoteStream, isInCall]);
 
   useEffect(() => {
-    if (localVideoRef?.current && localStream) {
-      localVideoRef.current.srcObject = localStream;
+    if (localStream && localVideoRef?.current) {
+      if (localVideoRef.current.srcObject !== localStream) {
+        localVideoRef.current.srcObject = localStream;
+      }
       localVideoRef.current.play().catch(() => {});
     }
-  }, [localStream]);
+  }, [localStream, isInCall]);
+
+  const handleUnmuteAudio = () => {
+    if (remoteVideoRef?.current) {
+      remoteVideoRef.current.muted = false;
+      remoteVideoRef.current.play().then(() => {
+        setIsAudioMutedByPolicy(false);
+      }).catch(e => console.warn('Unmute error:', e));
+    }
+  };
 
   if (!isInCall || !callPartner) return null;
 
@@ -165,8 +181,9 @@ export const VideoCallModal = ({ onOpenReport }) => {
   };
 
   const quickReactions = ['❤️', '😍', '🔥', '👏', '💋', '✨', '🌹'];
-
   const partnerAvatar = callPartner.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800';
+
+  const hasActiveRemoteVideo = isRemoteVideoPlaying || !!remoteStream;
 
   return (
     <div 
@@ -190,7 +207,7 @@ export const VideoCallModal = ({ onOpenReport }) => {
         <span>ID:{currentUser?.id} • {currentUser?.full_name?.split(' ')[0]} • AYARFLAME SECURE</span>
       </div>
       
-      {/* Remote Fullscreen Video & Live Face Feed (Main Screen - Zalo/FaceTime Style) */}
+      {/* Remote Fullscreen Video & Live Face Feed (Main Screen) */}
       <div className="relative w-full h-full flex items-center justify-center bg-black overflow-hidden">
         
         {/* WebRTC Video Track (Full Screen Live Camera of Partner) */}
@@ -198,15 +215,16 @@ export const VideoCallModal = ({ onOpenReport }) => {
           ref={remoteVideoRef}
           autoPlay
           playsInline
+          onLoadedMetadata={() => setIsRemoteVideoPlaying(true)}
+          onCanPlay={() => setIsRemoteVideoPlaying(true)}
           onPlaying={() => setIsRemoteVideoPlaying(true)}
-          onLoadedData={() => setIsRemoteVideoPlaying(true)}
           className={`absolute inset-0 w-full h-full object-cover z-20 transition-opacity duration-500 ${
-            isRemoteVideoPlaying ? 'opacity-100' : 'opacity-0 pointer-events-none'
+            hasActiveRemoteVideo ? 'opacity-100' : 'opacity-0 pointer-events-none'
           } ${beautyFilter ? 'brightness-105 contrast-105 saturate-110' : ''}`}
         />
 
-        {/* Fallback Partner Portrait & Blurred Background (Shown only before WebRTC stream connects) */}
-        <div className={`absolute inset-0 flex items-center justify-center overflow-hidden z-10 transition-opacity duration-500 ${isRemoteVideoPlaying ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
+        {/* Fallback Partner Portrait & Blurred Background (Shown before stream loads) */}
+        <div className={`absolute inset-0 flex items-center justify-center overflow-hidden z-10 transition-opacity duration-500 ${hasActiveRemoteVideo ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
           <div 
             className="absolute inset-0 scale-125 filter blur-3xl opacity-60 bg-cover bg-center"
             style={{ backgroundImage: `url(${partnerAvatar})` }}
@@ -218,7 +236,7 @@ export const VideoCallModal = ({ onOpenReport }) => {
             className="w-full h-full object-cover transition-all duration-500"
           />
 
-          {/* Connecting Camera Notice (Auto-dismisses after 2.5s) */}
+          {/* Connecting Camera Notice */}
           {showConnectingNotice && (
             <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center p-6 text-center space-y-3 z-10 transition-opacity duration-500 animate-fade-in">
               <div className="w-12 h-12 rounded-full border-4 border-rose-500 border-t-transparent animate-spin" />
@@ -226,6 +244,17 @@ export const VideoCallModal = ({ onOpenReport }) => {
             </div>
           )}
         </div>
+
+        {/* Browser Audio Policy Unmute Button */}
+        {isAudioMutedByPolicy && (
+          <button
+            onClick={handleUnmuteAudio}
+            className="absolute top-20 right-6 z-40 bg-gradient-to-r from-rose-500 to-pink-500 text-white px-4 py-2 rounded-full text-xs font-bold shadow-2xl animate-bounce flex items-center gap-2 border border-white/20"
+          >
+            <VolumeX className="w-4 h-4 text-white" />
+            <span>Bấm để bật âm thanh đối phương</span>
+          </button>
+        )}
 
         {/* Live Camera Broadcast Vignette & Gradients */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/60 pointer-events-none z-25" />
@@ -265,28 +294,7 @@ export const VideoCallModal = ({ onOpenReport }) => {
           ))}
         </div>
 
-        {/* Anti-Capture Dynamic Watermark Overlay */}
-        <div 
-          className="absolute pointer-events-none z-30 opacity-25 text-[11px] font-black text-white bg-black/50 backdrop-blur-md px-3 py-1 rounded-full border border-white/20 select-none transition-all duration-1000 shadow-xl"
-          style={{ top: watermarkPos.top, left: watermarkPos.left }}
-        >
-          🔒 AyarFlame DRM • {currentUser?.username} • ID: {currentUser?.id}
-        </div>
-
-        {/* Anti-Screen Recording / Anti-Screenshot Privacy Shield */}
-        {isBlurredByPrivacy && (
-          <div className="absolute inset-0 bg-black/95 backdrop-blur-3xl z-40 flex flex-col items-center justify-center p-6 text-center animate-fade-in select-none">
-            <div className="w-16 h-16 rounded-3xl bg-rose-500/20 border border-rose-500/40 text-rose-400 flex items-center justify-center mb-4 animate-pulse">
-              <ShieldAlert className="w-8 h-8" />
-            </div>
-            <h3 className="text-lg font-black text-white">CHỐNG GHI HÌNH & CHỤP ẢNH</h3>
-            <p className="text-xs text-gray-400 max-w-sm mt-2 leading-relaxed">
-              Hệ thống đã tự động làm mờ và bảo vệ luồng video 1v1 để đảm bảo quyền riêng tư tuyệt đối cho cả hai người dùng.
-            </p>
-          </div>
-        )}
-
-        {/* Floating In-Call Chat Messages (Always Visible on left screen) */}
+        {/* Floating In-Call Chat Messages */}
         <div className="absolute bottom-28 left-20 z-30 max-w-xs sm:max-w-sm space-y-2 pointer-events-none">
           {inCallMessages.slice(-4).map((msg) => (
             <div
