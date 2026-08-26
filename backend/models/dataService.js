@@ -26,25 +26,46 @@ class DataService {
   }
 
   async findUserByEmail(email) {
+    if (!email) return null;
+    const cleanEmail = String(email).trim().toLowerCase();
     if (!isUsingFallback()) {
-      const rows = await db.query('SELECT * FROM users WHERE email = ?', [email]);
-      return rows[0] || null;
+      const rows = await db.query('SELECT * FROM users WHERE LOWER(email) = ?', [cleanEmail]);
+      if (Array.isArray(rows) && rows.length > 0) {
+        const user = rows[0];
+        if (user && typeof user.interests === 'string') {
+          try { user.interests = JSON.parse(user.interests); } catch (e) { user.interests = []; }
+        }
+        return user;
+      }
+      return null;
     }
     const store = getMockStore();
-    return store.users.find(u => u.email.toLowerCase() === email.toLowerCase()) || null;
+    return store.users.find(u => u.email && u.email.toLowerCase() === cleanEmail) || null;
   }
 
   async findUserByUsername(username) {
+    if (!username) return null;
+    const cleanUsername = String(username).trim().toLowerCase();
     if (!isUsingFallback()) {
-      const rows = await db.query('SELECT * FROM users WHERE username = ?', [username]);
-      return rows[0] || null;
+      const rows = await db.query('SELECT * FROM users WHERE LOWER(username) = ?', [cleanUsername]);
+      if (Array.isArray(rows) && rows.length > 0) {
+        const user = rows[0];
+        if (user && typeof user.interests === 'string') {
+          try { user.interests = JSON.parse(user.interests); } catch (e) { user.interests = []; }
+        }
+        return user;
+      }
+      return null;
     }
     const store = getMockStore();
-    return store.users.find(u => u.username.toLowerCase() === username.toLowerCase()) || null;
+    return store.users.find(u => u.username && u.username.toLowerCase() === cleanUsername) || null;
   }
 
   async createUser(userData) {
-    const hashedPassword = await bcrypt.hash(userData.password, 10);
+    let hashedPassword = String(userData.password || '');
+    if (!hashedPassword.startsWith('$2a$') && !hashedPassword.startsWith('$2b$')) {
+      hashedPassword = await bcrypt.hash(hashedPassword, 10);
+    }
     const interestsJson = JSON.stringify(userData.interests || ['Du lịch', 'Cà phê', 'Âm nhạc']);
     
     if (!isUsingFallback()) {

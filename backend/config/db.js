@@ -75,7 +75,7 @@ if (fs.existsSync(DATA_FILE)) {
 }
 
 function saveStore() {
-  if (useFallbackDb) {
+  if (useFallbackDb || !pool) {
     try {
       fs.writeFileSync(DATA_FILE, JSON.stringify(mockStore, null, 2), 'utf8');
     } catch (e) {
@@ -155,5 +155,5 @@ module.exports = {
   query,
   getMockStore: () => mockStore,
   saveStore,
-  isUsingFallback: () => useFallbackDb
+  isUsingFallback: () => useFallbackDb || !pool
 };

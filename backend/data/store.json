@@ -790,6 +790,42 @@
       "role": "user",
       "created_at": "2026-08-25T07:25:13.738Z",
       "updated_at": "2026-08-25T07:25:13.738Z"
+    },
+    {
+      "id": 9,
+      "username": "testuser_1787744640366",
+      "email": "testuser_1787744640366@example.com",
+      "password": "$2a$10$5m5SLt3dDZuVpDP4lsjn7.VNaEHhoWRh2CpDyrIIYga7ZR8U2TIs6",
+      "full_name": "Test Account",
+      "gender": "male",
+      "birth_date": "2002-01-01",
+      "age": 23,
+      "bio": "Chào bạn! Rất vui được làm quen trên app ✨",
+      "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500&auto=format&fit=crop&q=80",
+      "job": "Designer",
+      "company_or_school": "Đại học Quốc Gia",
+      "city": "Hà Nội",
+      "country": "Việt Nam",
+      "latitude": 21.0285,
+      "longitude": 105.8542,
+      "interests": [
+        "Du lịch",
+        "Cà phê",
+        "Âm nhạc"
+      ],
+      "coins": 200,
+      "diamonds": 0,
+      "vip_level": 0,
+      "vip_expires_at": null,
+      "is_host": false,
+      "call_rate_per_min": 20,
+      "is_verified": false,
+      "is_online": true,
+      "is_in_call": false,
+      "role": "user",
+      "is_banned": false,
+      "created_at": "2026-08-26T11:44:00.442Z",
+      "updated_at": "2026-08-26T11:44:00.443Z"
     }
   ],
   "user_photos": [
@@ -1405,6 +1441,9 @@
   ],
   "verifications": [],
   "reports": [],
+  "deposits": [],
+  "vouchers": [],
+  "daily_checkins": [],
   "system_settings": {
     "call_rate_per_min": "20",
     "free_daily_matches": "10",
@@ -1414,7 +1453,7 @@
     "vip_platinum_price": "2500"
   },
   "autoIncrementIds": {
-    "users": 9,
+    "users": 10,
     "user_photos": 12,
     "swipes": 6,
     "matches": 3,

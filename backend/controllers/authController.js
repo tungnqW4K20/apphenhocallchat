@@ -19,12 +19,15 @@ const register = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Vui lòng điền đầy đủ các thông tin bắt buộc' });
     }
 
-    const existingEmail = await dataService.findUserByEmail(email);
+    const cleanUsername = String(username).trim();
+    const cleanEmail = String(email).trim().toLowerCase();
+
+    const existingEmail = await dataService.findUserByEmail(cleanEmail);
     if (existingEmail) {
       return res.status(400).json({ success: false, message: 'Email này đã được sử dụng' });
     }
 
-    const existingUsername = await dataService.findUserByUsername(username);
+    const existingUsername = await dataService.findUserByUsername(cleanUsername);
     if (existingUsername) {
       return res.status(400).json({ success: false, message: 'Tên người dùng này đã tồn tại' });
     }
@@ -33,15 +36,14 @@ const register = async (req, res) => {
     const userLat = (latitude !== undefined && latitude !== null) ? Number(latitude) : defaultCoords.lat;
     const userLon = (longitude !== undefined && longitude !== null) ? Number(longitude) : defaultCoords.lon;
 
-    const hashedPassword = await bcrypt.hash(password, 10);
     const user = await dataService.createUser({
-      username,
-      email,
-      password: hashedPassword,
-      full_name,
+      username: cleanUsername,
+      email: cleanEmail,
+      password: String(password),
+      full_name: String(full_name).trim(),
       gender: gender || 'male',
       birth_date: birth_date || '2000-01-01',
-      age: age || 22,
+      age: age ? Number(age) : 22,
       bio: bio || 'Xin chào! Rất vui được làm quen với mọi người 🌟',
       avatar: avatar || (gender === 'female' ? 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=500' : 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=500'),
       job: job || 'Thành viên',
@@ -75,12 +77,14 @@ const register = async (req, res) => {
 
 const login = async (req, res) => {
   try {
-    const loginKey = req.body.loginKey || req.body.username || req.body.email;
-    const { password } = req.body;
+    const rawLoginKey = req.body.loginKey || req.body.username || req.body.email;
+    const password = req.body.password;
 
-    if (!loginKey || !password) {
+    if (!rawLoginKey || !password) {
       return res.status(400).json({ success: false, message: 'Vui lòng nhập tên đăng nhập/email và mật khẩu' });
     }
+
+    const loginKey = String(rawLoginKey).trim();
 
     let user = await dataService.findUserByEmail(loginKey);
     if (!user) {
@@ -95,7 +99,8 @@ const login = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Tài khoản của bạn đã bị khóa vĩnh viễn' });
     }
 
-    const isMatch = await bcrypt.compare(password, user.password);
+    const plainPassword = String(password);
+    const isMatch = await bcrypt.compare(plainPassword, user.password);
     if (!isMatch) {
       return res.status(401).json({ success: false, message: 'Tài khoản hoặc mật khẩu không chính xác' });
     }
