@@ -65,18 +65,38 @@ let mockStore = {
   }
 };
 
+function recalculateAutoIncrementIds() {
+  const collections = [
+    'users', 'user_photos', 'swipes', 'matches', 'conversations',
+    'messages', 'gifts', 'call_logs', 'coin_packages', 'transactions',
+    'verifications', 'reports', 'deposits', 'vouchers', 'daily_checkins'
+  ];
+  if (!mockStore.autoIncrementIds) {
+    mockStore.autoIncrementIds = {};
+  }
+  for (const col of collections) {
+    const list = Array.isArray(mockStore[col]) ? mockStore[col] : [];
+    const maxId = list.reduce((max, item) => (item && Number(item.id) > max ? Number(item.id) : max), 0);
+    mockStore.autoIncrementIds[col] = Math.max(maxId + 1, Number(mockStore.autoIncrementIds[col]) || 1);
+  }
+}
+
 if (fs.existsSync(DATA_FILE)) {
   try {
     const loadedData = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
     mockStore = { ...mockStore, ...loadedData };
+    recalculateAutoIncrementIds();
   } catch (err) {
     console.error('Error loading fallback store:', err);
   }
+} else {
+  recalculateAutoIncrementIds();
 }
 
 function saveStore() {
   if (useFallbackDb || !pool) {
     try {
+      recalculateAutoIncrementIds();
       fs.writeFileSync(DATA_FILE, JSON.stringify(mockStore, null, 2), 'utf8');
     } catch (e) {
       console.error('Error saving fallback store:', e);

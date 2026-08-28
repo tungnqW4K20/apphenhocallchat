@@ -453,16 +453,18 @@ function startCallBilling(io, callerSocketId, receiverSocketId, callerId, receiv
         return;
       }
 
+      // Free calls for admin and female accounts
+      const isFreeAccount = caller.role === 'admin' || caller.gender === 'female';
       const rate = receiver.is_host ? (receiver.call_rate_per_min || 20) : 20;
 
       // Check if this minute is FREE under the 2-min free call voucher
-      const isFreeMinute = hasFree2MinVoucher && minutesElapsed <= 2;
+      const isFreeMinute = isFreeAccount || (hasFree2MinVoucher && minutesElapsed <= 2);
 
       if (!isFreeMinute) {
         if ((caller.coins || 0) < rate) {
           // Insufficient coins -> End call automatically
-          io.to(callerSocketId).emit('call_ended_insufficient_coins', { message: 'Bạn đã hết Xu. Cuộc gọi kết thúc!' });
-          io.to(receiverSocketId).emit('call_ended_insufficient_coins', { message: 'Đối phương đã hết Xu. Cuộc gọi kết thúc!' });
+          io.to(callerSocketId).emit('call_ended_insufficient_coins', { message: 'Bạn đã hết Xu để duy trì cuộc gọi. Vui lòng nạp thêm Xu!' });
+          io.to(receiverSocketId).emit('call_ended_insufficient_coins', { message: 'Cuộc gọi kết thúc do đối phương không đủ Xu!' });
           stopCallBilling(sessionId);
           return;
         }
@@ -479,20 +481,35 @@ function startCallBilling(io, callerSocketId, receiverSocketId, callerId, receiv
       const updatedCaller = await dataService.findUserById(callerId);
       const updatedReceiver = await dataService.findUserById(receiverId);
 
-      // Emit live updates
+      // Emit live updates to caller
       io.to(callerSocketId).emit('call_coin_tick', {
         deducted: isFreeMinute ? 0 : rate,
         is_free: isFreeMinute,
-        free_reason: isFreeMinute ? `Miễn phí phút ${minutesElapsed}/2 (Áp dụng Voucher)` : null,
-        remaining_coins: updatedCaller.coins,
+        minute: minutesElapsed,
+        free_reason: isFreeMinute ? (isFreeAccount ? 'Miễn phí cho Nữ / Admin' : `Miễn phí phút ${minutesElapsed}/2 (Voucher)`) : null,
+        remaining_coins: updatedCaller ? updatedCaller.coins : 0,
         duration_seconds: Math.floor((Date.now() - startedAt) / 1000)
       });
+      if (updatedCaller) {
+        io.to(callerSocketId).emit('balance_updated', {
+          coins: updatedCaller.coins,
+          diamonds: updatedCaller.diamonds
+        });
+      }
 
+      // Emit live updates to receiver
       io.to(receiverSocketId).emit('call_diamond_tick', {
-        earned: isFreeMinute ? Math.floor(rate * 0.7) : Math.floor(rate * 0.7),
-        total_diamonds: updatedReceiver.diamonds,
+        earned: isFreeMinute ? 0 : Math.floor(rate * 0.7),
+        total_diamonds: updatedReceiver ? updatedReceiver.diamonds : 0,
+        minute: minutesElapsed,
         duration_seconds: Math.floor((Date.now() - startedAt) / 1000)
       });
+      if (updatedReceiver) {
+        io.to(receiverSocketId).emit('balance_updated', {
+          coins: updatedReceiver.coins,
+          diamonds: updatedReceiver.diamonds
+        });
+      }
     } catch (err) {
       console.error('Call billing tick error:', err);
     }
@@ -515,9 +532,21 @@ function startCallBilling(io, callerSocketId, receiverSocketId, callerId, receiv
   });
 }
 
-function stopCallBilling(sessionId) {
-  if (!sessionId) return;
-  const session = activeCallSessions.get(sessionId);
+function stopCallBilling(sessionIdOrSocketId) {
+  if (!sessionIdOrSocketId) return;
+  let targetSessionId = sessionIdOrSocketId;
+  let session = activeCallSessions.get(targetSessionId);
+
+  if (!session) {
+    for (const [sId, sess] of activeCallSessions.entries()) {
+      if (sess.callerSocketId === sessionIdOrSocketId || sess.receiverSocketId === sessionIdOrSocketId || sId.includes(sessionIdOrSocketId)) {
+        targetSessionId = sId;
+        session = sess;
+        break;
+      }
+    }
+  }
+
   if (session) {
     clearInterval(session.timerInterval);
     const stats = session.getStats ? session.getStats() : { duration: 0, coinsSpent: 0, diamondsEarned: 0 };
@@ -537,7 +566,7 @@ function stopCallBilling(sessionId) {
       status: 'completed'
     }).catch(console.error);
 
-    activeCallSessions.delete(sessionId);
+    activeCallSessions.delete(targetSessionId);
   }
 }
 

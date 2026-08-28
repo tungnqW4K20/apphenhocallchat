@@ -259,40 +259,13 @@ export const WebRTCProvider = ({ children }) => {
         }
       }
 
-      // Start Call Timer
+      // Start Call Duration Timer (Display Only - Server handles exact billing)
       setCallDuration(0);
       clearInterval(durationTimerRef.current);
       let seconds = 0;
       durationTimerRef.current = setInterval(() => {
         seconds += 1;
         setCallDuration(seconds);
-
-        if (seconds > 0 && seconds % 60 === 0) {
-          const minuteNum = Math.floor(seconds / 60);
-          const activePartner = callPartnerRef.current;
-          if (activePartner) {
-            api.deductCallMinute({
-              receiver_id: activePartner.id,
-              call_type: callTypeRef.current || 'video'
-            }).then(res => {
-              if (res.success) {
-                updateBalance(res.remaining_coins, undefined);
-                setLatestCoinTick({
-                  amount: res.rate || 20,
-                  minute: minuteNum,
-                  id: Date.now()
-                });
-                setTimeout(() => setLatestCoinTick(null), 4000);
-              }
-            }).catch(err => {
-              console.warn('Minute billing tick error:', err);
-              if (err.message && (err.message.includes('hết Xu') || err.message.includes('không đủ'))) {
-                alert('⚠️ Bạn đã hết Xu để duy trì cuộc gọi! Cuộc gọi kết thúc.');
-                endCurrentCall();
-              }
-            });
-          }
-        }
       }, 1000);
     });
 
@@ -365,11 +338,23 @@ export const WebRTCProvider = ({ children }) => {
     });
 
     socket.on('call_coin_tick', (data) => {
-      updateBalance(data.remaining_coins, undefined);
+      if (data.remaining_coins !== undefined) {
+        updateBalance(data.remaining_coins, undefined);
+      }
+      setLatestCoinTick({
+        amount: data.deducted || 20,
+        minute: data.minute || 1,
+        is_free: data.is_free,
+        free_reason: data.free_reason,
+        id: Date.now()
+      });
+      setTimeout(() => setLatestCoinTick(null), 4000);
     });
 
     socket.on('call_diamond_tick', (data) => {
-      updateBalance(undefined, data.total_diamonds);
+      if (data.total_diamonds !== undefined) {
+        updateBalance(undefined, data.total_diamonds);
+      }
     });
 
     // Random Match Events

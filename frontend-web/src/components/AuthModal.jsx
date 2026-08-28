@@ -34,9 +34,17 @@ export const AuthModal = ({ isOpen, onClose }) => {
 
     try {
       if (isRegister) {
-        await register(formData);
+        await register({
+          username: (formData.username || '').trim(),
+          email: (formData.email || '').trim().toLowerCase(),
+          password: formData.password,
+          full_name: (formData.full_name || '').trim(),
+          gender: formData.gender || 'male',
+          age: Number(formData.age) || 22,
+          city: formData.city || 'Hà Nội'
+        });
       } else {
-        await login(formData.loginKey, formData.password);
+        await login((formData.loginKey || '').trim(), formData.password);
       }
       onClose();
     } catch (err) {

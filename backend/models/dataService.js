@@ -103,7 +103,10 @@ class DataService {
     }
 
     const store = getMockStore();
-    const newId = store.autoIncrementIds.users++;
+    const maxExistingId = store.users.reduce((max, u) => (u && Number(u.id) > max ? Number(u.id) : max), 0);
+    const newId = Math.max(maxExistingId + 1, Number(store.autoIncrementIds?.users) || 1);
+    if (!store.autoIncrementIds) store.autoIncrementIds = {};
+    store.autoIncrementIds.users = newId + 1;
     const newUser = {
       id: newId,
       username: userData.username,
